@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+  <title>Hibban's GCode AI</title>
+  <style>
+    @font-face {
+      font-family: 'Amiri';
+      src: url('fonts/amiri.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'Kalpurush';
+      src: url('fonts/kalpurush.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    :root {
+      --bg: #0b0e14;
+      --card: #141824;
+      --card-hover: #1b2132;
+      --card-user: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #6366f1;
+      --accent-grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      --cyan: #06b6d4;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      letter-spacing: 0.1px;
+    }
+
+    /* Font Specific Classes */
+    .ar-text {
+      font-family: 'Amiri', serif !important;
+      font-size: 1.18em;
+      line-height: 1.85;
+      direction: rtl;
+      unicode-bidi: embed;
+      display: inline;
+    }
+
+    .bn-text {
+      font-family: 'Kalpurush', sans-serif !important;
+      font-size: 1.06em;
+      line-height: 1.75;
+      letter-spacing: 0.35px;
+      word-spacing: 1.5px;
+      display: inline;
+    }
+
+    /* Top Bar */
+    header {
+      background: rgba(20, 24, 36, 0.98);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-img {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .brand-info h1 {
+      font-size: 16.5px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      color: #fff;
+    }
+
+    .brand-info p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .status-dot.busy {
+      background: var(--yellow);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.3); }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 10px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 17px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:active {
+      background: rgba(255, 255, 255, 0.15);
+      transform: scale(0.95);
+    }
+
+    /* Live Action Banner */
+    #live-status {
+      display: none;
+      padding: 9px 16px;
+      background: rgba(99, 102, 241, 0.12);
+      border-top: 1px solid rgba(99, 102, 241, 0.25);
+      font-size: 13px;
+      color: #a5b4fc;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(99, 102, 241, 0.3);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Chat Area */
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .empty-state {
+      margin: auto;
+      text-align: center;
+      max-width: 320px;
+      padding: 30px 20px;
+    }
+
+    .empty-img {
+      width: 76px;
+      height: 76px;
+      border-radius: 20px;
+      object-fit: cover;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .empty-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .empty-desc {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Message Rows */
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .msg-row.user {
+      align-items: flex-end;
+    }
+
+    .msg-row.agent {
+      align-items: flex-start;
+    }
+
+    .bubble {
+      max-width: 95%;
+      padding: 14px 18px;
+      border-radius: 18px;
+      font-size: 16px;
+      line-height: 1.65;
+      word-wrap: break-word;
+    }
+
+    .msg-row.user .bubble {
+      background: var(--card-user);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+    }
+
+    .msg-row.agent .bubble {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      width: 96%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Tool Activity Accordion */
+    .actions-accordion {
+      margin-bottom: 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .actions-header {
+      padding: 9px 13px;
+      background: rgba(255, 255, 255, 0.03);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .actions-body {
+      padding: 10px 13px;
+      display: none;
+      flex-direction: column;
+      gap: 7px;
+      border-top: 1px solid var(--border);
+    }
+
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      color: var(--text-muted);
+      font-family: monospace;
+      font-size: 12.5px;
+    }
+
+    .action-badge {
+      color: var(--green);
+      font-weight: bold;
+    }
+
+    /* Code Block & Markdown */
+    pre {
+      background: #05070c;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 12px 0;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      color: #38bdf8;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: #fff;
+      padding: 4px 9px;
+      font-size: 11px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    /* Clean Input Footer */
+    footer {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+
+    #user-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 11px 16px;
+      border-radius: 16px;
+      font-size: 16px;
+      resize: none;
+      max-height: 120px;
+      min-height: 46px;
+      line-height: 1.45;
+      outline: none;
+      font-family: inherit;
+    }
+
+    #user-input:focus {
+      border-color: var(--accent);
+    }
+
+    #send-btn {
+      background: var(--accent-grad);
+      border: none;
+      color: #fff;
+      border-radius: 14px;
+      width: 46px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 19px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      flex-shrink: 0;
+    }
+
+    #send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-box h2 {
+      font-size: 19px;
+      margin-bottom: 8px;
+    }
+
+    .modal-box p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .input-field {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      outline: none;
+      font-family: monospace;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+    }
+
+    .delete-key-btn {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--red);
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .btn-add-key {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px dashed var(--border);
+      color: var(--cyan);
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--accent-grad);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 10px;
+      border-radius: 12px;
+      font-size: 14px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+
+    /* Sleek Clear Confirmation Modal */
+    .confirm-box {
+      text-align: center;
+      max-width: 330px;
+      padding: 26px 20px;
+    }
+
+    .confirm-icon-wrap {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px auto;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.28);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 0 24px rgba(239, 68, 68, 0.2);
+    }
+
+    .confirm-box h2 {
+      font-size: 19px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .confirm-box p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .modal-btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-cancel {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel:active {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-danger {
+      flex: 1;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+      transition: opacity 0.2s;
+    }
+
+    .btn-danger:active {
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <img src="icon.png" class="brand-img" alt="GCode AI">
+      <div class="brand-info">
+        <h1>Hibban's GCode AI</h1>
+        <p><span id="status-dot" class="status-dot"></span> <span id="status-text">Ready</span></p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openClearModal()" title="Clear Chat">🗑️</button>
+      <button class="icon-btn" onclick="openKeyModal()" title="API Keys">🔑</button>
+    </div>
+  </header>
+
+  <!-- Live Action Banner -->
+  <div id="live-status">
+    <div class="spinner"></div>
+    <span id="live-status-text">Thinking...</span>
+  </div>
+
+  <!-- Chat Stream -->
+  <div id="chat-container">
+    <div class="empty-state" id="empty-state">
+      <img src="icon.png" class="empty-img" alt="Hibban's GCode AI">
+      <div class="empty-title">Hibban's GCode AI</div>
+      <div class="empty-desc">Your autonomous AI developer with full Termux Linux access and multimodal vision. How can I help you today?</div>
+    </div>
+  </div>
+
+  <!-- Clean Input Footer -->
+  <footer>
+    <textarea id="user-input" rows="1" placeholder="Type a message or task..." oninput="autoResize(this)" onkeydown="checkEnter(event)"></textarea>
+    <button id="send-btn" onclick="handleSend()">➔</button>
+  </footer>
+
+  <!-- Beautiful Clear Chat Confirmation Modal -->
+  <div class="modal-backdrop" id="clear-modal">
+    <div class="modal-box confirm-box">
+      <div class="confirm-icon-wrap">🗑️</div>
+      <h2>Clear History?</h2>
+      <p>Are you sure you want to clear the conversation? All messages will be permanently deleted.</p>
+      <div class="modal-btn-row">
+        <button type="button" class="btn-cancel" onclick="closeClearModal()">Cancel</button>
+        <button type="button" class="btn-danger" onclick="confirmClearChat()">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key Setup Modal (Dynamic Key Inputs, No Commas) -->
+  <div class="modal-backdrop" id="key-modal">
+    <div class="modal-box">
+      <h2>🔑 Gemini API Keys</h2>
+      <p>Enter your Google Gemini API Key. Click "+ Add Another Key" to add multiple keys for continuous quota rotation without limits!</p>
+      
+      <div id="key-fields-container">
+        <!-- Dynamic Key Rows Injected Here -->
+      </div>
+
+      <button class="btn-add-key" onclick="addKeyRow('')">+ Add Another Key</button>
+
+      <p style="font-size: 12px; margin-bottom: 14px;">Get free keys at: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--cyan);">aistudio.google.com</a></p>
+      
+      <button class="btn-primary" onclick="saveKeysFromModal()">Save Keys</button>
+      <button class="btn-secondary" id="cancel-key-btn" onclick="closeKeyModal()">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    // System definitions
+    const TOOLS = [
+      {
+        name: "view_image",
+        description: "Inspect, view, and visually analyze any image/photo/screenshot file on the Android device (e.g. photos in /storage/emulated/0/DCIM/Camera, screenshots in /storage/emulated/0/DCIM/Screenshots, pictures in Download). Returns a detailed visual multimodal description of what is in the image. You MUST use this tool whenever the user asks about or refers to an image, photo, or screenshot on the phone.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            file_path: { type: "STRING", description: "Absolute path to the image file on device." },
+            question: { type: "STRING", description: "Specific question or what details to inspect in the image." }
+          },
+          required: ["file_path"]
+        }
+      },
+      {
+        name: "run_command",
+        description: "Execute a shell/terminal command on Android device with full Termux Linux environment (bash, python, pip, pkg, curl, git, etc.).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            command: { type: "STRING", description: "The command to run." },
+            working_dir: { type: "STRING", description: "Optional working directory (defaults to /storage/emulated/0)." }
+          },
+          required: ["command"]
+        }
+      },
+      {
+        name: "read_file",
+        description: "Read local file contents with line numbers.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            file_path: { type: "STRING", description: "Absolute path to file." },
+            start_line: { type: "INTEGER", description: "Start line number (1-indexed)." },
+            end_line: { type: "INTEGER", description: "End line number (inclusive)." }
+          },
+          required: ["file_path"]
+        }
+      },
+      {
+        name: "write_file",
+        description: "Create or overwrite a file on device storage.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            file_path: { type: "STRING", description: "Absolute path to file." },
+            content: { type: "STRING", description: "Content to write." }
+          },
+          required: ["file_path", "content"]
+        }
+      },
+      {
+        name: "edit_file",
+        description: "Perform precise text replacement in a file.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            file_path: { type: "STRING", description: "Absolute path to file." },
+            target_text: { type: "STRING", description: "Exact text snippet to replace." },
+            replacement_text: { type: "STRING", description: "New replacement text." }
+          },
+          required: ["file_path", "target_text", "replacement_text"]
+        }
+      },
+      {
+        name: "list_directory",
+        description: "List files and folders in directory.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            dir_path: { type: "STRING", description: "Directory path." }
+          },
+          required: ["dir_path"]
+        }
+      }
+    ];
+
+    const SYSTEM_PROMPT = `You are Hibban's GCode AI, an unrestricted autonomous AI assistant and developer running natively on the user's Android phone.
+You have direct, full access to Termux's complete Linux environment and tools (bash, python, pip, pkg, apt, git, node, curl, etc.) via run_command.
+You have complete multimodal vision capabilities:
+- view_image: Inspect, view, and visually analyze any photo, picture, or screenshot on the phone (e.g. in /storage/emulated/0/DCIM/Camera, /storage/emulated/0/DCIM/Screenshots, /storage/emulated/0/Download, etc.). Whenever the user mentions or asks about a photo, picture, image, or screenshot, FIND the file and use view_image to inspect it immediately!
+- run_command: Run any terminal/shell command, install any package with pkg/pip/npm autonomously, execute scripts.
+- Python 3.14 is ALREADY installed at /data/data/com.termux/files/usr/bin/python3 (or 'python3'). You do NOT need to install python. You can run python scripts or one-liners directly!
+- read_file: Read files
+- write_file: Create/overwrite files
+- edit_file: Edit files
+- list_directory: List files
+
+Important Paths on this device:
+- Camera Photos: /storage/emulated/0/DCIM/Camera
+- Screenshots: /storage/emulated/0/DCIM/Screenshots
+- Downloads: /storage/emulated/0/Download
+- Primary Storage: /storage/emulated/0
+- Termux Home: /data/data/com.termux/files/home
+
+If any task requires inspecting images, running shell commands, or installing packages, perform it autonomously without restrictions.
+Be concise, helpful, and execute tasks completely.`;
+
+    // 100% Stable Models
+    const PRIMARY_MODEL = "gemini-flash-lite-latest";
+    const FALLBACK_MODEL = "gemini-3.7-flash";
+    let activeModel = PRIMARY_MODEL;
+
+    let apiKeys = [];
+    let activeKeyIndex = 0;
+    let chatHistory = [];
+    let isProcessing = false;
+
+    // Viewport resize handling for mobile keyboard
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        const container = document.getElementById("chat-container");
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+
+    // Initialize
+    window.addEventListener("DOMContentLoaded", () => {
+      loadConfig();
+      restoreChat();
+
+      if (apiKeys.length === 0) {
+        openKeyModal(false);
+      }
+    });
+
+    function loadConfig() {
+      let savedKeysJson = "";
+      if (window.AndroidBridge) {
+        savedKeysJson = window.AndroidBridge.getConfig("api_keys_json", "");
+      }
+      if (!savedKeysJson) {
+        savedKeysJson = localStorage.getItem("api_keys_json") || "";
+      }
+
+      if (savedKeysJson) {
+        try {
+          const parsed = JSON.parse(savedKeysJson);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            apiKeys = parsed.filter(k => typeof k === "string" && k.trim().length > 0);
+          }
+        } catch (e) {}
+      }
+    }
+
+    function openKeyModal(preventClose = false) {
+      const container = document.getElementById("key-fields-container");
+      container.innerHTML = "";
+
+      if (apiKeys.length === 0) {
+        addKeyRow("");
+      } else {
+        apiKeys.forEach(k => addKeyRow(k));
+      }
+
+      const cancelBtn = document.getElementById("cancel-key-btn");
+      cancelBtn.style.display = preventClose || apiKeys.length === 0 ? "none" : "block";
+
+      document.getElementById("key-modal").style.display = "flex";
+    }
+
+    function closeKeyModal() {
+      if (apiKeys.length === 0) return;
+      document.getElementById("key-modal").style.display = "none";
+    }
+
+    function addKeyRow(initialValue = "") {
+      const container = document.getElementById("key-fields-container");
+      const row = document.createElement("div");
+      row.className = "key-row";
+
+      row.innerHTML = `
+        <input type="password" class="input-field key-input-item" placeholder="AIzaSy..." value="${escapeHtml(initialValue)}">
+        <button type="button" class="delete-key-btn" onclick="removeKeyRow(this)" title="Delete Key">✕</button>
+      `;
+
+      container.appendChild(row);
+      const input = row.querySelector("input");
+      if (!initialValue) {
+        input.focus();
+      }
+    }
+
+    function removeKeyRow(btn) {
+      const container = document.getElementById("key-fields-container");
+      const rows = container.querySelectorAll(".key-row");
+      if (rows.length <= 1) {
+        btn.parentElement.querySelector("input").value = "";
+        return;
+      }
+      btn.parentElement.remove();
+    }
+
+    function saveKeysFromModal() {
+      const inputs = document.querySelectorAll(".key-input-item");
+      const newKeys = [];
+
+      inputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val) newKeys.push(val);
+      });
+
+      if (newKeys.length === 0) {
+        alert("Please enter at least one API Key.");
+        return;
+      }
+
+      apiKeys = newKeys;
+      const jsonStr = JSON.stringify(apiKeys);
+      if (window.AndroidBridge) {
+        window.AndroidBridge.saveConfig("api_keys_json", jsonStr);
+      } else {
+        localStorage.setItem("api_keys_json", jsonStr);
+      }
+
+      closeKeyModal();
+    }
+
+    function autoResize(el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    }
+
+    function checkEnter(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    }
+
+    /* Custom Sleek Clear Modal Handlers */
+    function openClearModal() {
+      document.getElementById("clear-modal").style.display = "flex";
+    }
+
+    function closeClearModal() {
+      document.getElementById("clear-modal").style.display = "none";
+    }
+
+    function confirmClearChat() {
+      closeClearModal();
+      chatHistory = [];
+      localStorage.removeItem("gcode_chat_history");
+      localStorage.removeItem("gcode_chat_html");
+      if (window.AndroidBridge) {
+        window.AndroidBridge.saveConfig("saved_chat_history", "");
+        window.AndroidBridge.saveConfig("saved_chat_html", "");
+      }
+      document.getElementById("chat-container").innerHTML = `
+        <div class="empty-state" id="empty-state">
+          <img src="icon.png" class="empty-img" alt="Hibban's GCode AI">
+          <div class="empty-title">Hibban's GCode AI</div>
+          <div class="empty-desc">Your autonomous AI developer with full Termux Linux access and multimodal vision. How can I help you today?</div>
+        </div>
+      `;
+    }
+
+    function persistChat() {
+      try {
+        const historyJson = JSON.stringify(chatHistory);
+        const containerHtml = document.getElementById("chat-container").innerHTML;
+        localStorage.setItem("gcode_chat_history", historyJson);
+        localStorage.setItem("gcode_chat_html", containerHtml);
+        if (window.AndroidBridge) {
+          window.AndroidBridge.saveConfig("saved_chat_history", historyJson);
+          window.AndroidBridge.saveConfig("saved_chat_html", containerHtml);
+        }
+      } catch (e) {}
+    }
+
+    function restoreChat() {
+      try {
+        let historyJson = "";
+        let containerHtml = "";
+        if (window.AndroidBridge) {
+          historyJson = window.AndroidBridge.getConfig("saved_chat_history", "");
+          containerHtml = window.AndroidBridge.getConfig("saved_chat_html", "");
+        }
+        if (!containerHtml) {
+          historyJson = localStorage.getItem("gcode_chat_history") || "";
+          containerHtml = localStorage.getItem("gcode_chat_html") || "";
+        }
+
+        if (containerHtml && containerHtml.includes("msg-row")) {
+          document.getElementById("chat-container").innerHTML = containerHtml;
+          if (historyJson) {
+            chatHistory = JSON.parse(historyJson);
+          }
+          const container = document.getElementById("chat-container");
+          setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
+        }
+      } catch (e) {}
+    }
+
+    function appendMessage(role, text, actions = []) {
+      const container = document.getElementById("chat-container");
+      const emptyState = document.getElementById("empty-state");
+      if (emptyState) emptyState.remove();
+
+      const row = document.createElement("div");
+      row.className = `msg-row ${role}`;
+
+      let actionsHtml = "";
+      if (actions.length > 0) {
+        actionsHtml = `
+          <div class="actions-accordion">
+            <div class="actions-header" onclick="toggleActions(this)">
+              <span>⚡ Executed ${actions.length} action${actions.length > 1 ? 's' : ''}</span>
+              <span>▼</span>
+            </div>
+            <div class="actions-body">
+              ${actions.map(a => `<div class="action-item"><span class="action-badge">✓</span> <span>${escapeHtml(a)}</span></div>`).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      row.innerHTML = `
+        <div class="bubble">
+          ${actionsHtml}
+          <div>${formatMarkdown(text)}</div>
+        </div>
+      `;
+
+      container.appendChild(row);
+      container.scrollTop = container.scrollHeight;
+      persistChat();
+    }
+
+    function toggleActions(el) {
+      const body = el.nextElementSibling;
+      const isHidden = body.style.display !== "flex";
+      body.style.display = isHidden ? "flex" : "none";
+      el.querySelector("span:last-child").textContent = isHidden ? "▲" : "▼";
+    }
+
+    function setLiveStatus(active, text = "") {
+      const banner = document.getElementById("live-status");
+      const liveText = document.getElementById("live-status-text");
+      const dot = document.getElementById("status-dot");
+      const statusText = document.getElementById("status-text");
+
+      banner.style.display = active ? "flex" : "none";
+      if (active) {
+        dot.className = "status-dot busy";
+        statusText.textContent = text;
+        liveText.textContent = text;
+      } else {
+        dot.className = "status-dot";
+        statusText.textContent = "Ready";
+      }
+    }
+
+    async function handleSend() {
+      if (isProcessing) return;
+      const input = document.getElementById("user-input");
+      const prompt = input.value.trim();
+      if (!prompt) return;
+
+      if (!apiKeys.length) {
+        openKeyModal(true);
+        return;
+      }
+
+      input.value = "";
+      autoResize(input);
+      appendMessage("user", prompt);
+
+      isProcessing = true;
+      document.getElementById("send-btn").disabled = true;
+      setLiveStatus(true, "Thinking...");
+
+      try {
+        await runAgentLoop(prompt);
+      } catch (err) {
+        appendMessage("agent", `⚠️ Error: ${err.message}`);
+      } finally {
+        isProcessing = false;
+        document.getElementById("send-btn").disabled = false;
+        setLiveStatus(false);
+      }
+    }
+
+    // Controlled single-request dispatcher with polite rotation
+    async function fetchGeminiWithRotation(payload) {
+      const numKeys = apiKeys.length;
+      let lastError = "";
+
+      for (let attempt = 0; attempt < numKeys; attempt++) {
+        const curKey = apiKeys[(activeKeyIndex + attempt) % numKeys];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${curKey}`;
+
+        try {
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          if (resp.status === 200) {
+            activeKeyIndex = (activeKeyIndex + attempt) % numKeys;
+            return await resp.json();
+          }
+
+          if (resp.status === 429) {
+            lastError = "Rate limited (429)";
+            if (numKeys > 1) {
+              setLiveStatus(true, "Rotating to next API key...");
+              await new Promise(r => setTimeout(r, 1000));
+              continue;
+            } else {
+              throw new Error("API Key rate limited (429). Please wait a minute or add another key.");
+            }
+          }
+
+          if (resp.status === 503) {
+            lastError = "Model busy (503)";
+            activeModel = (activeModel === PRIMARY_MODEL) ? FALLBACK_MODEL : PRIMARY_MODEL;
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+
+          const txt = await resp.text();
+          throw new Error(`API Error (${resp.status}): ${txt}`);
+        } catch (e) {
+          lastError = e.message;
+          if (attempt < numKeys - 1) {
+            await new Promise(r => setTimeout(r, 800));
+            continue;
+          }
+          throw e;
+        }
+      }
+
+      throw new Error(`All API keys currently busy or limited: ${lastError}`);
+    }
+
+    async function runAgentLoop(userPrompt) {
+      chatHistory.push({
+        role: "user",
+        parts: [{ text: userPrompt }]
+      });
+
+      const maxSteps = 15;
+      let step = 0;
+      let executedActions = [];
+
+      while (step < maxSteps) {
+        step++;
+        const payload = {
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: chatHistory,
+          tools: [{ function_declarations: TOOLS }]
+        };
+
+        const data = await fetchGeminiWithRotation(payload);
+        const candidate = data.candidates?.[0];
+        if (!candidate || !candidate.content) {
+          throw new Error("No response received from Gemini.");
+        }
+
+        const content = candidate.content;
+        chatHistory.push(content);
+
+        const parts = content.parts || [];
+        const toolCalls = parts.filter(p => p.functionCall).map(p => p.functionCall);
+        const textParts = parts.filter(p => p.text).map(p => p.text).join("").trim();
+
+        if (toolCalls.length === 0) {
+          appendMessage("agent", textParts || "Task completed.", executedActions);
+          return;
+        }
+
+        // Execute Tool Calls
+        const responseParts = [];
+        for (const call of toolCalls) {
+          const fname = call.name;
+          const fargs = call.args || {};
+
+          let summary = "";
+          if (fname === "view_image") summary = `Inspected image: ${fargs.file_path}`;
+          else if (fname === "run_command") summary = `Ran command: ${fargs.command}`;
+          else if (fname === "write_file") summary = `Wrote file: ${fargs.file_path}`;
+          else if (fname === "read_file") summary = `Read file: ${fargs.file_path}`;
+          else if (fname === "edit_file") summary = `Edited file: ${fargs.file_path}`;
+          else if (fname === "list_directory") summary = `Listed directory: ${fargs.dir_path}`;
+
+          executedActions.push(summary);
+          setLiveStatus(true, `Executing: ${fname}...`);
+
+          const result = await executeTool(fname, fargs);
+          responseParts.push({
+            functionResponse: {
+              name: fname,
+              response: { output: result }
+            }
+          });
+        }
+
+        chatHistory.push({
+          role: "user",
+          parts: responseParts
+        });
+      }
+
+      appendMessage("agent", "Task completed.", executedActions);
+    }
+
+    async function executeTool(name, args) {
+      if (!window.AndroidBridge) {
+        return `[Browser Preview] Tool '${name}' called with: ` + JSON.stringify(args);
+      }
+
+      try {
+        if (name === "view_image") {
+          const imgJson = window.AndroidBridge.readImageBase64(args.file_path, 1280, 1280);
+          const obj = JSON.parse(imgJson);
+          if (!obj.success) {
+            return `Failed to inspect image: ${obj.error}`;
+          }
+
+          const visionPrompt = args.question 
+            ? `You are an expert multimodal visual analyzer. Analyze this image from device path "${args.file_path}". In-depth inquiry: ${args.question}`
+            : `You are an expert multimodal visual analyzer. Analyze this image from device path "${args.file_path}". Provide a thorough, vivid description of everything seen in the picture (people, clothes, actions, objects, surroundings, text, lighting, details).`;
+
+          const visionPayload = {
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: visionPrompt },
+                  {
+                    inline_data: {
+                      mime_type: obj.mimeType || "image/jpeg",
+                      data: obj.base64
+                    }
+                  }
+                ]
+              }
+            ]
+          };
+
+          const visionData = await fetchGeminiWithRotation(visionPayload);
+          const visionText = visionData.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "No visual text returned.";
+          return `[Visual Analysis of ${args.file_path} (${obj.width}x${obj.height})]:\n${visionText}`;
+        } else if (name === "run_command") {
+          const workDir = args.working_dir || "/storage/emulated/0";
+          const resJson = window.AndroidBridge.executeCommand(args.command, workDir);
+          const obj = JSON.parse(resJson);
+          return (obj.stdout || "") + (obj.stderr ? "\nSTDERR:\n" + obj.stderr : "") + `\n[Exit Code: ${obj.exitCode}]`;
+        } else if (name === "read_file") {
+          const resJson = window.AndroidBridge.readFile(args.file_path, args.start_line || 1, args.end_line || 9999);
+          const obj = JSON.parse(resJson);
+          return obj.success ? obj.content : `Error: ${obj.error}`;
+        } else if (name === "write_file") {
+          const resJson = window.AndroidBridge.writeFile(args.file_path, args.content);
+          const obj = JSON.parse(resJson);
+          return obj.success ? `Successfully wrote ${obj.bytesWritten} bytes to ${obj.path}` : `Error: ${obj.error}`;
+        } else if (name === "edit_file") {
+          const resJson = window.AndroidBridge.editFile(args.file_path, args.target_text, args.replacement_text);
+          const obj = JSON.parse(resJson);
+          return obj.success ? obj.message : `Error: ${obj.error}`;
+        } else if (name === "list_directory") {
+          const resJson = window.AndroidBridge.listDirectory(args.dir_path);
+          const obj = JSON.parse(resJson);
+          if (obj.success) {
+            return obj.files.map(f => `${f.isDirectory ? '[DIR] ' : '[FILE]'} ${f.name}`).join("\n");
+          }
+          return `Error: ${obj.error}`;
+        }
+      } catch (e) {
+        return `Tool Execution Exception: ${e.message}`;
+      }
+
+      return `Error: Unknown tool '${name}'`;
+    }
+
+    function formatMarkdown(text) {
+      if (!text) return "";
+      let html = escapeHtml(text);
+
+      // Preserve code blocks before font wrapping
+      const codeBlocks = [];
+      html = html.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (m, lang, code) => {
+        const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+        codeBlocks.push(`<pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>${code.trim()}</code></pre>`);
+        return id;
+      });
+
+      // Wrap Arabic words in .ar-text (Amiri font at 1.18x size, RTL)
+      html = html.replace(/([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)/g, '<span class="ar-text">$1</span>');
+
+      // Wrap Bengali words in .bn-text (Kalpurush font with spacious letter and word spacing)
+      html = html.replace(/([\u0980-\u09FF]+)/g, '<span class="bn-text">$1</span>');
+
+      // Restore code blocks
+      codeBlocks.forEach((cb, idx) => {
+        html = html.replace(`__CODE_BLOCK_${idx}__`, cb);
+      });
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Bold
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // Lists
+      html = html.replace(/^\s*-\s+(.*)$/gm, '• $1<br>');
+      // Newlines
+      html = html.replace(/\n/g, '<br>');
+
+      return html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+    }
+
+    function copyCode(btn) {
+      const code = btn.nextElementSibling.innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy", 1500);
+      });
+    }
+  </script>
+</body>
+</html>

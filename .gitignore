@@ -1,0 +1,4 @@
+bin/
+gen/
+*.log
+.DS_Store
