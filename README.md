@@ -6,7 +6,7 @@ Developed by **Ahmad Hibban**.
 
 ---
 
-## 🌟 Key Highlights
+## ✨ Features
 
 - **Native Linux Execution:** Connects directly to Termux's `/data/data/com.termux/files/usr/bin/bash` with full environment variables (`PATH`, `PREFIX`, `HOME`, `PYTHONPATH`, `SSL_CERT_FILE`, `JAVA_HOME`).
 - **Autonomous Multimodal Vision:** Inspects and analyzes any photo, camera capture, or screenshot on the phone using Gemini's multimodal vision model via the `view_image` tool.
@@ -14,6 +14,7 @@ Developed by **Ahmad Hibban**.
 - **Zero Buffer Deadlocks & Stdin Protection:** Merged stdout/stderr streams, non-interactive execution, and 120s timeout protection.
 - **Multi-Key Quota Rotation:** Supports multiple Google Gemini API keys with intelligent automatic rotation upon rate limits (429).
 - **Persistent Chat:** Conversation history is securely preserved across app restarts and device reboots.
+- **Sleek Custom Modal:** Elegant dark-glass confirmation dialog for clearing history with zero clunky OS prompts.
 - **Bilingual & Beautiful Typography:** Custom high-legibility Bengali font (*Kalpurush*) and Arabic font (*Amiri*) with a sleek dark slate theme.
 
 ---
@@ -29,10 +30,20 @@ Developed by **Ahmad Hibban**.
 
 ---
 
+## 📱 Prebuilt APK
+
+The signed, ready-to-install Android APK is available in the repository at:
+[`apk/GCode_AI.apk`](apk/GCode_AI.apk)
+
+---
+
 ## 📁 Repository Structure
 
 ```
 ├── AndroidManifest.xml   # Full permissions & hardware access
+├── apk/
+│   ├── GCode_AI.apk      # Signed Release APK
+│   └── GCode_AI.apk.idsig # APK signature v4 scheme ID
 ├── assets/
 │   ├── index.html        # Modern Dark Chat UI & Agent engine
 │   ├── icon.png          # App 3D branding icon
@@ -44,22 +55,33 @@ Developed by **Ahmad Hibban**.
 ├── build_apk.sh          # Native Termux build script (aapt + javac + d8 + apksigner)
 ├── debug.keystore        # Keystore for release APK signing
 ├── gcode_cli.py          # Standalone Termux CLI version
-└── GCode_AI.apk          # Prebuilt, ready-to-install Android APK
+└── README.md             # Project documentation
 ```
 
 ---
 
-## 🚀 How to Build APK inside Termux
+## 🛠️ Build from Source (Termux / Linux)
 
+Prerequisites:
+- Android SDK build tools (`aapt`, `d8`, `apksigner`)
+- `android.jar` (API 28+)
+- Java compiler (`javac`)
+
+To build and sign the APK:
 ```bash
-cd GCode_AI
 bash build_apk.sh
 ```
+The output APK will be placed in `apk/GCode_AI.apk`.
 
-Output APK will be generated and signed at `GCode_AI.apk`.
+---
+
+## 👤 Author
+
+**Ahmad Hibban**
+- GitHub: [@ahmadhibban](https://github.com/ahmadhibban)
 
 ---
 
 ## 📄 License
 
-MIT License. Created by Ahmad Hibban.
+Open-source under the MIT License. Copyright © Ahmad Hibban.

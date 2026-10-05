@@ -30,8 +30,13 @@ aapt add app.unsigned.apk classes.dex
 cd ..
 
 echo "==> 6. Signing APK with keystore..."
-OUT_APK="/storage/emulated/0/Download/GCode_AI.apk"
+mkdir -p "$DIR/apk"
+OUT_APK="$DIR/apk/GCode_AI.apk"
 apksigner sign --ks debug.keystore --ks-pass pass:android --out "$OUT_APK" bin/app.unsigned.apk
+
+# Copy to root and Download folder for easy access
+cp -f "$OUT_APK" "$DIR/GCode_AI.apk"
+cp -f "$OUT_APK" "/storage/emulated/0/Download/GCode_AI.apk" 2>/dev/null || true
 
 echo "==> 7. Verifying APK..."
 apksigner verify -v "$OUT_APK"
