@@ -31,6 +31,7 @@ public class WebAppInterface {
     public WebAppInterface(Context context) {
         this.context = context;
         this.prefs = context.getSharedPreferences("gcode_prefs", Context.MODE_PRIVATE);
+        cleanOldTempFiles();
     }
 
     private File resolveFile(String filePath) {
@@ -292,16 +293,46 @@ public class WebAppInterface {
         return executeViaTermuxService(command, dir.getAbsolutePath());
     }
 
+    private void cleanOldTempFiles() {
+        try {
+            File tmpDir = new File(Environment.getExternalStorageDirectory(), ".gcode_tmp");
+            if (tmpDir.exists() && tmpDir.isDirectory()) {
+                File[] files = tmpDir.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        try { f.delete(); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            // Also clean any legacy leftover .gcode_* files in Download
+            File dlDir = new File(Environment.getExternalStorageDirectory(), "Download");
+            if (dlDir.exists() && dlDir.isDirectory()) {
+                File[] dlFiles = dlDir.listFiles();
+                if (dlFiles != null) {
+                    for (File f : dlFiles) {
+                        if (f.getName().startsWith(".gcode_")) {
+                            try { f.delete(); } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     private String executeViaTermuxService(String command, String workDirPath) {
         JSONObject result = new JSONObject();
+        File scriptFile = null;
+        File outFile = null;
+        File exitFile = null;
+
         try {
             long id = System.currentTimeMillis();
-            File downloadDir = new File(Environment.getExternalStorageDirectory(), "Download");
-            if (!downloadDir.exists()) downloadDir.mkdirs();
+            File tmpDir = new File(Environment.getExternalStorageDirectory(), ".gcode_tmp");
+            if (!tmpDir.exists()) tmpDir.mkdirs();
 
-            File scriptFile = new File(downloadDir, ".gcode_task_" + id + ".sh");
-            File outFile = new File(downloadDir, ".gcode_out_" + id + ".txt");
-            File exitFile = new File(downloadDir, ".gcode_exit_" + id + ".txt");
+            scriptFile = new File(tmpDir, "task_" + id + ".sh");
+            outFile = new File(tmpDir, "out_" + id + ".txt");
+            exitFile = new File(tmpDir, "exit_" + id + ".txt");
 
             StringBuilder sb = new StringBuilder();
             sb.append("#!/data/data/com.termux/files/usr/bin/bash\n");
@@ -317,6 +348,7 @@ public class WebAppInterface {
             sb.append("cd \"").append(workDirPath).append("\"\n");
             sb.append("(\n").append(command).append("\n) > \"").append(outFile.getAbsolutePath()).append("\" 2>&1\n");
             sb.append("echo $? > \"").append(exitFile.getAbsolutePath()).append("\"\n");
+            sb.append("rm -f \"$0\" 2>/dev/null\n");
 
             FileOutputStream fos = new FileOutputStream(scriptFile);
             fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
@@ -348,9 +380,6 @@ public class WebAppInterface {
                 result.put("stdout", "");
                 result.put("stderr", "Command execution timed out after 120s");
                 result.put("exitCode", -1);
-                scriptFile.delete();
-                outFile.delete();
-                exitFile.delete();
                 return result.toString();
             }
 
@@ -379,10 +408,6 @@ public class WebAppInterface {
                 }
             }
 
-            scriptFile.delete();
-            outFile.delete();
-            exitFile.delete();
-
             result.put("success", true);
             result.put("stdout", outText);
             result.put("stderr", "");
@@ -393,6 +418,16 @@ public class WebAppInterface {
                 result.put("stdout", "");
                 result.put("stderr", "Execution Error: " + e.getMessage());
                 result.put("exitCode", -1);
+            } catch (Exception ignored) {}
+        } finally {
+            try {
+                if (scriptFile != null && scriptFile.exists()) scriptFile.delete();
+            } catch (Exception ignored) {}
+            try {
+                if (outFile != null && outFile.exists()) outFile.delete();
+            } catch (Exception ignored) {}
+            try {
+                if (exitFile != null && exitFile.exists()) exitFile.delete();
             } catch (Exception ignored) {}
         }
         return result.toString();

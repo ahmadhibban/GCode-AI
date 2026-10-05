@@ -737,7 +737,7 @@ You have direct, full access to Termux's complete Linux environment and tools (b
 You have complete multimodal vision capabilities:
 - view_image: Inspect, view, and visually analyze any photo, picture, or screenshot on the phone (e.g. in /storage/emulated/0/DCIM/Camera, /storage/emulated/0/DCIM/Screenshots, /storage/emulated/0/Download, etc.). Whenever the user mentions or asks about a photo, picture, image, or screenshot, FIND the file and use view_image to inspect it immediately!
 - run_command: Run any terminal/shell command, install any package with pkg/pip/npm autonomously, execute scripts.
-- Python 3.14 is ALREADY installed at /data/data/com.termux/files/usr/bin/python3 (or 'python3'). You do NOT need to install python. You can run python scripts or one-liners directly!
+- Python 3.14 is ALREADY installed with python-docx, python-lxml, and standard tools. You can run python scripts directly!
 - read_file: Read files
 - write_file: Create/overwrite files
 - edit_file: Edit files
@@ -751,9 +751,13 @@ Important Paths on this device:
 - Termux Home: /data/data/com.termux/files/home
 
 CRITICAL RULES & CAPABILITIES:
-- You have 100% full, unrestricted access to the Termux Linux environment (Python 3.14, bash, etc.) via run_command and unrestricted filesystem access via read_file and write_file.
-- NEVER claim that there is a security policy, permission limit, or environment restriction preventing you from executing scripts or generating files. You have full permission and access to everything.
-- When the user asks you to generate a large list, dataset, vocabulary, or file (e.g. 500 or 1,000 items), NEVER output a partial sample (like 50 or 100) and stop with an excuse! You must fulfill the entire request completely. If helpful, you can write and execute a Python script with run_command to generate the complete file in full.
+- Full Unrestricted Access: You have full access to the Termux Linux environment (Python 3.14, bash, etc.) via run_command and unrestricted filesystem access. NEVER claim that there is a security policy, permission limit, or environment restriction preventing you from executing scripts or generating files.
+- Real Word Documents (.docx): The library 'python-docx' is INSTALLED in Python! You can create genuine Microsoft Word (.docx) files using 'import docx' in python scripts, creating tables, formatting cells, adding headings, etc.
+- Complete Deliverables (Zero Half-Measures): When the user asks for a specific count (e.g. 500 or 1,000 Urdu words with Bengali meaning):
+  1. NEVER generate only 50 or 100 items and claim that 1,000 items were created! That is strictly forbidden.
+  2. Write and execute a Python script to produce all 1,000 items completely.
+  3. ALWAYS verify your output using run_command (e.g. 'wc -l' for text files or python script checking docx row count) before declaring completion.
+- Accuracy & Honesty: If a task requires multiple steps or a file only has partial content, be honest and complete the remaining items. Never lie about file contents or progress.
 Be concise, helpful, and execute tasks completely.`;
 
     // 100% Stable Models
@@ -1101,7 +1105,7 @@ Be concise, helpful, and execute tasks completely.`;
         parts: [{ text: userPrompt }]
       });
 
-      const maxSteps = 15;
+      const maxSteps = 30;
       let step = 0;
       let executedActions = [];
 
@@ -1163,7 +1167,19 @@ Be concise, helpful, and execute tasks completely.`;
         });
       }
 
-      appendMessage("agent", "Task completed.", executedActions);
+      // If reached maxSteps, request a concluding summary from the model
+      try {
+        setLiveStatus(true, "Concluding response...");
+        const finalPayload = {
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: chatHistory
+        };
+        const finalData = await fetchGeminiWithRotation(finalPayload);
+        const finalSummary = finalData.candidates?.[0]?.content?.parts?.filter(p => p.text).map(p => p.text).join("").trim();
+        appendMessage("agent", finalSummary || "Task actions executed.", executedActions);
+      } catch (e) {
+        appendMessage("agent", "Action limit reached. Tasks executed.", executedActions);
+      }
     }
 
     async function executeTool(name, args) {
