@@ -750,7 +750,10 @@ Important Paths on this device:
 - Primary Storage: /storage/emulated/0
 - Termux Home: /data/data/com.termux/files/home
 
-If any task requires inspecting images, running shell commands, or installing packages, perform it autonomously without restrictions.
+CRITICAL RULES & CAPABILITIES:
+- You have 100% full, unrestricted access to the Termux Linux environment (Python 3.14, bash, etc.) via run_command and unrestricted filesystem access via read_file and write_file.
+- NEVER claim that there is a security policy, permission limit, or environment restriction preventing you from executing scripts or generating files. You have full permission and access to everything.
+- When the user asks you to generate a large list, dataset, vocabulary, or file (e.g. 500 or 1,000 items), NEVER output a partial sample (like 50 or 100) and stop with an excuse! You must fulfill the entire request completely. If helpful, you can write and execute a Python script with run_command to generate the complete file in full.
 Be concise, helpful, and execute tasks completely.`;
 
     // 100% Stable Models

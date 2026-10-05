@@ -1,6 +1,7 @@
 package com.gcode.ai;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -44,17 +45,14 @@ public class WebAppInterface {
         if (f.isAbsolute()) {
             return f;
         }
-        // Try /storage/emulated/0 first
         File f1 = new File(Environment.getExternalStorageDirectory(), cleanPath);
         if (f1.exists()) {
             return f1;
         }
-        // Try Termux home
         File f2 = new File("/data/data/com.termux/files/home", cleanPath);
         if (f2.exists()) {
             return f2;
         }
-        // Default to /storage/emulated/0
         return f1;
     }
 
@@ -87,10 +85,6 @@ public class WebAppInterface {
         }
     }
 
-    /**
-     * Reads an image file from storage, resizes it safely, and returns Base64 JPEG data.
-     * Memory-safe with bounds decoding & inSampleSize.
-     */
     @JavascriptInterface
     public String readImageBase64(String filePath, int maxWidth, int maxHeight) {
         JSONObject result = new JSONObject();
@@ -105,7 +99,6 @@ public class WebAppInterface {
             int reqWidth = (maxWidth > 0) ? maxWidth : 1280;
             int reqHeight = (maxHeight > 0) ? maxHeight : 1280;
 
-            // Step 1: Decode bounds only
             BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
             boundsOptions.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getAbsolutePath(), boundsOptions);
@@ -119,13 +112,11 @@ public class WebAppInterface {
                 return result.toString();
             }
 
-            // Step 2: Compute inSampleSize
             int inSampleSize = 1;
             while ((origWidth / (inSampleSize * 2)) >= reqWidth && (origHeight / (inSampleSize * 2)) >= reqHeight) {
                 inSampleSize *= 2;
             }
 
-            // Step 3: Decode bitmap with sample size
             BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
             decodeOptions.inSampleSize = inSampleSize;
             decodeOptions.inPreferredConfig = Bitmap.Config.RGB_565;
@@ -137,7 +128,6 @@ public class WebAppInterface {
                 return result.toString();
             }
 
-            // Step 4: Scale down if needed
             Bitmap finalBitmap = sampledBitmap;
             int currentW = sampledBitmap.getWidth();
             int currentH = sampledBitmap.getHeight();
@@ -152,7 +142,6 @@ public class WebAppInterface {
                 }
             }
 
-            // Step 5: Compress to JPEG
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             finalBitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos);
             byte[] imageBytes = baos.toByteArray();
@@ -176,9 +165,6 @@ public class WebAppInterface {
         return result.toString();
     }
 
-    /**
-     * Reads any binary or text file as base64 (up to 10MB).
-     */
     @JavascriptInterface
     public String readFileBase64(String filePath) {
         JSONObject result = new JSONObject();
@@ -219,7 +205,8 @@ public class WebAppInterface {
 
     /**
      * Executes shell commands with full Termux Linux environment.
-     * Deadlock-free stream merging, non-interactive stdin, and timeout protection.
+     * Dual execution: tries direct ProcessBuilder, and if Android SELinux denies cross-app
+     * access, falls back seamlessly to Termux RunCommandService.
      */
     @JavascriptInterface
     public String executeCommand(String command, String workingDir) {
@@ -227,19 +214,19 @@ public class WebAppInterface {
         StringBuilder output = new StringBuilder();
         int exitCode = -1;
 
-        try {
-            File dir;
-            if (workingDir != null && !workingDir.trim().isEmpty()) {
-                dir = new File(workingDir);
-                if (!dir.exists() || !dir.isDirectory()) {
-                    dir = new File("/data/data/com.termux/files/home");
-                    if (!dir.exists()) dir = Environment.getExternalStorageDirectory();
-                }
-            } else {
-                dir = new File("/data/data/com.termux/files/home");
-                if (!dir.exists()) dir = Environment.getExternalStorageDirectory();
+        File dir;
+        if (workingDir != null && !workingDir.trim().isEmpty()) {
+            dir = new File(workingDir);
+            if (!dir.exists() || !dir.isDirectory()) {
+                dir = new File("/storage/emulated/0/Download");
             }
+        } else {
+            dir = new File("/storage/emulated/0/Download");
+        }
 
+        // Try direct ProcessBuilder execution first
+        boolean directSucceeded = false;
+        try {
             File termuxBash = new File("/data/data/com.termux/files/usr/bin/bash");
             String[] cmdArray;
             if (termuxBash.exists() && termuxBash.canExecute()) {
@@ -251,9 +238,8 @@ public class WebAppInterface {
             ProcessBuilder pb = new ProcessBuilder(cmdArray);
             pb.directory(dir);
 
-            // Full Termux environment injection
             Map<String, String> env = pb.environment();
-            env.put("PATH", "/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets:/system/bin:/system/xbin");
+            env.put("PATH", "/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin");
             env.put("LD_LIBRARY_PATH", "/data/data/com.termux/files/usr/lib");
             env.put("PREFIX", "/data/data/com.termux/files/usr");
             env.put("HOME", "/data/data/com.termux/files/home");
@@ -264,14 +250,10 @@ public class WebAppInterface {
             env.put("SSL_CERT_FILE", "/data/data/com.termux/files/usr/etc/tls/cert.pem");
             env.put("DEBIAN_FRONTEND", "noninteractive");
             env.put("PYTHONPATH", "/data/data/com.termux/files/usr/lib/python3.14/site-packages");
-            env.put("JAVA_HOME", "/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk");
 
-            // Merge stderr into stdout to guarantee zero buffer deadlock
             pb.redirectErrorStream(true);
-
             Process process = pb.start();
 
-            // Close stdin so command never hangs on interactive input
             try {
                 process.getOutputStream().close();
             } catch (Exception ignored) {}
@@ -288,20 +270,123 @@ public class WebAppInterface {
             }
             reader.close();
 
-            // Safe timeout: 120 seconds max per command
-            boolean finished = process.waitFor(120, TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroy();
-                output.append("\n[Process Timed Out after 120s]");
-                exitCode = -1;
-            } else {
+            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            if (finished) {
                 exitCode = process.exitValue();
+                // If exitCode is 0 or command produced valid output without permission denial
+                String outStr = output.toString();
+                if (!outStr.contains("Permission denied") && !outStr.contains("not found")) {
+                    directSucceeded = true;
+                    result.put("success", true);
+                    result.put("stdout", outStr);
+                    result.put("stderr", "");
+                    result.put("exitCode", exitCode);
+                    return result.toString();
+                }
+            }
+        } catch (Exception ignored) {
+            // Direct execution failed due to SELinux denial, fall back to Termux service
+        }
+
+        // Fallback: Execute via Termux RunCommandService (Guaranteed zero-SELinux-obstruction)
+        return executeViaTermuxService(command, dir.getAbsolutePath());
+    }
+
+    private String executeViaTermuxService(String command, String workDirPath) {
+        JSONObject result = new JSONObject();
+        try {
+            long id = System.currentTimeMillis();
+            File downloadDir = new File(Environment.getExternalStorageDirectory(), "Download");
+            if (!downloadDir.exists()) downloadDir.mkdirs();
+
+            File scriptFile = new File(downloadDir, ".gcode_task_" + id + ".sh");
+            File outFile = new File(downloadDir, ".gcode_out_" + id + ".txt");
+            File exitFile = new File(downloadDir, ".gcode_exit_" + id + ".txt");
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("#!/data/data/com.termux/files/usr/bin/bash\n");
+            sb.append("export PATH=\"/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin\"\n");
+            sb.append("export LD_LIBRARY_PATH=\"/data/data/com.termux/files/usr/lib\"\n");
+            sb.append("export PREFIX=\"/data/data/com.termux/files/usr\"\n");
+            sb.append("export HOME=\"/data/data/com.termux/files/home\"\n");
+            sb.append("export TMPDIR=\"/data/data/com.termux/files/usr/tmp\"\n");
+            sb.append("export SSL_CERT_FILE=\"/data/data/com.termux/files/usr/etc/tls/cert.pem\"\n");
+            sb.append("export LANG=\"en_US.UTF-8\"\n");
+            sb.append("export DEBIAN_FRONTEND=\"noninteractive\"\n");
+            sb.append("export PYTHONPATH=\"/data/data/com.termux/files/usr/lib/python3.14/site-packages\"\n");
+            sb.append("cd \"").append(workDirPath).append("\"\n");
+            sb.append("(\n").append(command).append("\n) > \"").append(outFile.getAbsolutePath()).append("\" 2>&1\n");
+            sb.append("echo $? > \"").append(exitFile.getAbsolutePath()).append("\"\n");
+
+            FileOutputStream fos = new FileOutputStream(scriptFile);
+            fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            fos.flush();
+            fos.close();
+
+            Intent intent = new Intent();
+            intent.setClassName("com.termux", "com.termux.app.RunCommandService");
+            intent.setAction("com.termux.RUN_COMMAND");
+            intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
+            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{scriptFile.getAbsolutePath()});
+            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", workDirPath);
+            intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+
+            context.startService(intent);
+
+            long startTime = System.currentTimeMillis();
+            boolean done = false;
+            while (System.currentTimeMillis() - startTime < 120000) {
+                if (exitFile.exists() && exitFile.length() > 0) {
+                    done = true;
+                    break;
+                }
+                Thread.sleep(100);
             }
 
+            if (!done) {
+                result.put("success", false);
+                result.put("stdout", "");
+                result.put("stderr", "Command execution timed out after 120s");
+                result.put("exitCode", -1);
+                scriptFile.delete();
+                outFile.delete();
+                exitFile.delete();
+                return result.toString();
+            }
+
+            String outText = "";
+            if (outFile.exists()) {
+                FileInputStream fis = new FileInputStream(outFile);
+                byte[] b = new byte[(int) Math.min(outFile.length(), 100000)];
+                int r = fis.read(b);
+                fis.close();
+                if (r > 0) {
+                    outText = new String(b, 0, r, StandardCharsets.UTF_8);
+                }
+            }
+
+            int exitVal = 0;
+            if (exitFile.exists()) {
+                FileInputStream fis = new FileInputStream(exitFile);
+                byte[] b = new byte[32];
+                int r = fis.read(b);
+                fis.close();
+                if (r > 0) {
+                    String str = new String(b, 0, r, StandardCharsets.UTF_8).trim();
+                    try {
+                        exitVal = Integer.parseInt(str);
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            scriptFile.delete();
+            outFile.delete();
+            exitFile.delete();
+
             result.put("success", true);
-            result.put("stdout", output.toString());
+            result.put("stdout", outText);
             result.put("stderr", "");
-            result.put("exitCode", exitCode);
+            result.put("exitCode", exitVal);
         } catch (Exception e) {
             try {
                 result.put("success", false);
@@ -310,7 +395,6 @@ public class WebAppInterface {
                 result.put("exitCode", -1);
             } catch (Exception ignored) {}
         }
-
         return result.toString();
     }
 
