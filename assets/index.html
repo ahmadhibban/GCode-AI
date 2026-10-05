@@ -733,32 +733,35 @@
     ];
 
     const SYSTEM_PROMPT = `You are Hibban's GCode AI, an unrestricted autonomous AI assistant and developer running natively on the user's Android phone.
-You have direct, full access to Termux's complete Linux environment and tools (bash, python, pip, pkg, apt, git, node, curl, etc.) via run_command.
+You are modeled after Antigravity CLI with full autonomous execution capabilities and direct access to Termux's complete Linux environment (bash, python, pip, pkg, apt, git, curl, etc.) via run_command.
 You have complete multimodal vision capabilities:
-- view_image: Inspect, view, and visually analyze any photo, picture, or screenshot on the phone (e.g. in /storage/emulated/0/DCIM/Camera, /storage/emulated/0/DCIM/Screenshots, /storage/emulated/0/Download, etc.). Whenever the user mentions or asks about a photo, picture, image, or screenshot, FIND the file and use view_image to inspect it immediately!
-- run_command: Run any terminal/shell command, install any package with pkg/pip/npm autonomously, execute scripts.
-- Python 3.14 is ALREADY installed with python-docx, python-lxml, and standard tools. You can run python scripts directly!
+- view_image: Inspect, view, and visually analyze any photo, picture, or screenshot on the phone (e.g. in /storage/emulated/0/DCIM/Camera, /storage/emulated/0/DCIM/Screenshots, /storage/emulated/0/Download, etc.). Whenever the user mentions or asks about an image or screenshot, FIND the file and use view_image to inspect it immediately!
+- run_command: Execute terminal/shell commands in Termux Linux environment.
 - read_file: Read files
 - write_file: Create/overwrite files
 - edit_file: Edit files
 - list_directory: List files
 
-Important Paths on this device:
+Important Paths:
 - Camera Photos: /storage/emulated/0/DCIM/Camera
 - Screenshots: /storage/emulated/0/DCIM/Screenshots
 - Downloads: /storage/emulated/0/Download
 - Primary Storage: /storage/emulated/0
 - Termux Home: /data/data/com.termux/files/home
 
-CRITICAL RULES & CAPABILITIES:
-- Full Unrestricted Access: You have full access to the Termux Linux environment (Python 3.14, bash, etc.) via run_command and unrestricted filesystem access. NEVER claim that there is a security policy, permission limit, or environment restriction preventing you from executing scripts or generating files.
-- Real Word Documents (.docx): The library 'python-docx' is INSTALLED in Python! You can create genuine Microsoft Word (.docx) files using 'import docx' in python scripts, creating tables, formatting cells, adding headings, etc.
-- Complete Deliverables (Zero Half-Measures): When the user asks for a specific count (e.g. 500 or 1,000 Urdu words with Bengali meaning):
-  1. NEVER generate only 50 or 100 items and claim that 1,000 items were created! That is strictly forbidden.
-  2. Write and execute a Python script to produce all 1,000 items completely.
-  3. ALWAYS verify your output using run_command (e.g. 'wc -l' for text files or python script checking docx row count) before declaring completion.
-- Accuracy & Honesty: If a task requires multiple steps or a file only has partial content, be honest and complete the remaining items. Never lie about file contents or progress.
-Be concise, helpful, and execute tasks completely.`;
+CORE PRINCIPLES (Modeled after Antigravity CLI):
+1. Autonomous On-Demand Package Installation:
+   You have complete autonomy and capability to install ANY package, tool, or library on demand (e.g. 'pip install <package>', 'pkg install <package>', 'npm install <package>') using run_command whenever a task requires it. There is no limit to what packages you can use; install whatever is needed to get the job done!
+2. Unrestricted Task Loop (Zero Half-Measures):
+   You run in an unrestricted loop without artificial step limits. Work step by step until the user's task is 100% completed.
+   - When asked to generate large datasets or files (e.g. 500 or 1,000 items), NEVER output a small sample of 50 or 100 items and claim it is complete!
+   - Write a script to produce the full dataset completely into the requested file format (.docx, .txt, .json, etc.).
+   - ALWAYS verify your output using run_command (e.g. 'wc -l' for text files or python script checking row counts) before declaring completion.
+3. Word Documents & Formats:
+   Whenever the user requests a Word (.docx) file, install 'python-docx' via pip if not present or create genuine docx files with Python scripts.
+4. Clean Workspace:
+   Keep user directories tidy. Do not leave temporary script files in Download.
+Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
 
     // 100% Stable Models
     const PRIMARY_MODEL = "gemini-flash-lite-latest";
@@ -1015,8 +1018,25 @@ Be concise, helpful, and execute tasks completely.`;
       }
     }
 
+    let abortRequested = false;
+
+    async function sleepWithCountdown(seconds, statusPrefix) {
+      for (let s = seconds; s > 0; s--) {
+        if (abortRequested) break;
+        setLiveStatus(true, `${statusPrefix} (${s}s)...`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
     async function handleSend() {
-      if (isProcessing) return;
+      const sendBtn = document.getElementById("send-btn");
+      if (isProcessing) {
+        abortRequested = true;
+        setLiveStatus(true, "Stopping agent...");
+        sendBtn.disabled = true;
+        return;
+      }
+
       const input = document.getElementById("user-input");
       const prompt = input.value.trim();
       if (!prompt) return;
@@ -1031,86 +1051,111 @@ Be concise, helpful, and execute tasks completely.`;
       appendMessage("user", prompt);
 
       isProcessing = true;
-      document.getElementById("send-btn").disabled = true;
+      abortRequested = false;
+      sendBtn.innerHTML = "&#9632;"; // Stop icon
+      sendBtn.title = "Stop Agent";
+      sendBtn.style.background = "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
       setLiveStatus(true, "Thinking...");
 
       try {
         await runAgentLoop(prompt);
       } catch (err) {
-        appendMessage("agent", `⚠️ Error: ${err.message}`);
+        appendMessage("agent", `⚠️ ${err.message}`);
       } finally {
         isProcessing = false;
-        document.getElementById("send-btn").disabled = false;
+        abortRequested = false;
+        sendBtn.innerHTML = "&#10148;"; // Send arrow
+        sendBtn.title = "Send";
+        sendBtn.style.background = "";
+        sendBtn.disabled = false;
         setLiveStatus(false);
       }
     }
 
-    // Controlled single-request dispatcher with polite rotation
+    // Controlled single-request dispatcher with Antigravity-style quota cooldown
     async function fetchGeminiWithRotation(payload) {
       const numKeys = apiKeys.length;
       let lastError = "";
+      let retryCount = 0;
+      const maxRetries = 10;
 
-      for (let attempt = 0; attempt < numKeys; attempt++) {
-        const curKey = apiKeys[(activeKeyIndex + attempt) % numKeys];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${curKey}`;
+      while (retryCount < maxRetries) {
+        if (abortRequested) throw new Error("Task stopped by user.");
 
-        try {
-          const resp = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+        let sawRateLimit = false;
 
-          if (resp.status === 200) {
-            activeKeyIndex = (activeKeyIndex + attempt) % numKeys;
-            return await resp.json();
-          }
+        for (let attempt = 0; attempt < numKeys; attempt++) {
+          if (abortRequested) throw new Error("Task stopped by user.");
+          const curKey = apiKeys[(activeKeyIndex + attempt) % numKeys];
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${curKey}`;
 
-          if (resp.status === 429) {
-            lastError = "Rate limited (429)";
-            if (numKeys > 1) {
-              setLiveStatus(true, "Rotating to next API key...");
+          try {
+            const resp = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+
+            if (resp.status === 200) {
+              activeKeyIndex = (activeKeyIndex + attempt) % numKeys;
+              return await resp.json();
+            }
+
+            if (resp.status === 429) {
+              sawRateLimit = true;
+              lastError = "Rate limited (429)";
+              if (numKeys > 1 && attempt < numKeys - 1) {
+                setLiveStatus(true, "Rotating to next API key...");
+                await new Promise(r => setTimeout(r, 600));
+                continue;
+              }
+            } else if (resp.status === 503) {
+              lastError = "Model busy (503)";
+              activeModel = (activeModel === PRIMARY_MODEL) ? FALLBACK_MODEL : PRIMARY_MODEL;
               await new Promise(r => setTimeout(r, 1000));
               continue;
             } else {
-              throw new Error("API Key rate limited (429). Please wait a minute or add another key.");
+              const txt = await resp.text();
+              throw new Error(`API Error (${resp.status}): ${txt}`);
             }
+          } catch (e) {
+            lastError = e.message;
+            if (e.message.includes("stopped by user")) throw e;
+            if (e.message.includes("429")) sawRateLimit = true;
           }
-
-          if (resp.status === 503) {
-            lastError = "Model busy (503)";
-            activeModel = (activeModel === PRIMARY_MODEL) ? FALLBACK_MODEL : PRIMARY_MODEL;
-            await new Promise(r => setTimeout(r, 1000));
-            continue;
-          }
-
-          const txt = await resp.text();
-          throw new Error(`API Error (${resp.status}): ${txt}`);
-        } catch (e) {
-          lastError = e.message;
-          if (attempt < numKeys - 1) {
-            await new Promise(r => setTimeout(r, 800));
-            continue;
-          }
-          throw e;
         }
+
+        if (abortRequested) throw new Error("Task stopped by user.");
+
+        if (sawRateLimit) {
+          retryCount++;
+          // Antigravity CLI behavior: wait for 60s cooldown and resume automatically!
+          appendMessage("agent", "⏳ Quota rate limit (429) reached. Waiting 60 seconds for cooldown before resuming...");
+          await sleepWithCountdown(60, "Quota rate limit cooldown. Resuming in");
+          if (abortRequested) throw new Error("Task stopped by user.");
+          continue;
+        }
+
+        retryCount++;
+        await new Promise(r => setTimeout(r, 1500));
       }
 
-      throw new Error(`All API keys currently busy or limited: ${lastError}`);
+      throw new Error("Quota limit currently active on Gemini API keys. Please wait a moment or add another key in 🔑 settings. Send any message to resume seamlessly from this exact point.");
     }
 
     async function runAgentLoop(userPrompt) {
-      chatHistory.push({
-        role: "user",
-        parts: [{ text: userPrompt }]
-      });
+      if (userPrompt) {
+        chatHistory.push({
+          role: "user",
+          parts: [{ text: userPrompt }]
+        });
+      }
 
-      const maxSteps = 30;
-      let step = 0;
       let executedActions = [];
 
-      while (step < maxSteps) {
-        step++;
+      // Completely UNRESTRICTED agent loop like Antigravity CLI!
+      // Runs autonomously until task is truly finished or user stops it.
+      while (!abortRequested) {
         const payload = {
           system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: chatHistory,
@@ -1130,6 +1175,7 @@ Be concise, helpful, and execute tasks completely.`;
         const toolCalls = parts.filter(p => p.functionCall).map(p => p.functionCall);
         const textParts = parts.filter(p => p.text).map(p => p.text).join("").trim();
 
+        // When the model finishes its tool usage, it returns pure text -> Task complete!
         if (toolCalls.length === 0) {
           appendMessage("agent", textParts || "Task completed.", executedActions);
           return;
@@ -1138,6 +1184,11 @@ Be concise, helpful, and execute tasks completely.`;
         // Execute Tool Calls
         const responseParts = [];
         for (const call of toolCalls) {
+          if (abortRequested) {
+            appendMessage("agent", "Task paused by user.", executedActions);
+            return;
+          }
+
           const fname = call.name;
           const fargs = call.args || {};
 
@@ -1165,20 +1216,11 @@ Be concise, helpful, and execute tasks completely.`;
           role: "user",
           parts: responseParts
         });
+        persistChat();
       }
 
-      // If reached maxSteps, request a concluding summary from the model
-      try {
-        setLiveStatus(true, "Concluding response...");
-        const finalPayload = {
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: chatHistory
-        };
-        const finalData = await fetchGeminiWithRotation(finalPayload);
-        const finalSummary = finalData.candidates?.[0]?.content?.parts?.filter(p => p.text).map(p => p.text).join("").trim();
-        appendMessage("agent", finalSummary || "Task actions executed.", executedActions);
-      } catch (e) {
-        appendMessage("agent", "Action limit reached. Tasks executed.", executedActions);
+      if (abortRequested) {
+        appendMessage("agent", "Task paused by user.", executedActions);
       }
     }
 
