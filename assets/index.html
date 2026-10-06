@@ -607,18 +607,12 @@
     <span id="live-status-text">Thinking...</span>
   </div>
 
-  <!-- Termux Permission Warning Banner -->
-  <div id="termux-perm-banner" style="display:none; padding:10px 16px; background:rgba(239,68,68,0.18); border-bottom:1px solid rgba(239,68,68,0.35); font-size:13px; color:#fca5a5; align-items:center; justify-content:space-between; cursor:pointer;" onclick="openAppSettings()">
-    <span>⚠️ Termux run command permission needed. Tap to enable.</span>
-    <span style="font-weight:bold; text-decoration:underline;">Settings ➔</span>
-  </div>
-
   <!-- Chat Stream -->
   <div id="chat-container">
     <div class="empty-state" id="empty-state">
       <img src="icon.png" class="empty-img" alt="Hibban's GCode AI">
       <div class="empty-title">Hibban's GCode AI</div>
-      <div class="empty-desc">Your autonomous AI developer with full Termux Linux access and multimodal vision. How can I help you today?</div>
+      <div class="empty-desc">Your autonomous AI developer with 100% standalone embedded Linux (Python 3.14, Pip, Bash, Git, Curl) and multimodal vision. How can I help you today?</div>
     </div>
   </div>
 
@@ -677,12 +671,12 @@
       },
       {
         name: "run_command",
-        description: "Execute a shell/terminal command on Android device with full Termux Linux environment (bash, python, pip, pkg, curl, git, etc.).",
+        description: "Execute a shell/terminal command on Android device with built-in standalone embedded Linux environment (bash, python 3.14, pip, git, curl, coreutils, aapt, proot, etc.).",
         parameters: {
           type: "OBJECT",
           properties: {
             command: { type: "STRING", description: "The command to run." },
-            working_dir: { type: "STRING", description: "Optional working directory (defaults to /storage/emulated/0)." }
+            working_dir: { type: "STRING", description: "Optional working directory (defaults to /storage/emulated/0/Download)." }
           },
           required: ["command"]
         }
@@ -739,25 +733,26 @@
     ];
 
     const SYSTEM_PROMPT = `You are Hibban's GCode AI, an unrestricted autonomous AI assistant and developer running natively on the user's Android phone.
-You are modeled after Antigravity CLI with full autonomous execution capabilities and direct access to Termux's complete Linux environment (bash, python, pip, pkg, apt, git, curl, etc.) via run_command.
+You have a complete, 100% STANDALONE embedded Linux distribution (Python 3.14, Pip, Bash, Git, Curl, Coreutils, PRoot, Android build tools) bundled directly inside this app.
+You run completely standalone in user-space and DO NOT rely on Termux or any external app.
+
 You have complete multimodal vision capabilities:
 - view_image: Inspect, view, and visually analyze any photo, picture, or screenshot on the phone (e.g. in /storage/emulated/0/DCIM/Camera, /storage/emulated/0/DCIM/Screenshots, /storage/emulated/0/Download, etc.). Whenever the user mentions or asks about an image or screenshot, FIND the file and use view_image to inspect it immediately!
-- run_command: Execute terminal/shell commands in Termux Linux environment.
+- run_command: Execute terminal/shell commands in your embedded Linux environment (bash, python3, pip, curl, git, etc.).
 - read_file: Read files
 - write_file: Create/overwrite files
 - edit_file: Edit files
 - list_directory: List files
 
 Important Paths:
-- Camera Photos: /storage/emulated/0/DCIM/Camera
-- Screenshots: /storage/emulated/0/DCIM/Screenshots
 - Downloads: /storage/emulated/0/Download
 - Primary Storage: /storage/emulated/0
-- Termux Home: /data/data/com.termux/files/home
+- Camera Photos: /storage/emulated/0/DCIM/Camera
+- Screenshots: /storage/emulated/0/DCIM/Screenshots
 
 CORE PRINCIPLES (Modeled after Antigravity CLI):
 1. Autonomous On-Demand Package Installation:
-   You have complete autonomy and capability to install ANY package, tool, or library on demand (e.g. 'pip install <package>', 'pkg install <package>', 'npm install <package>') using run_command whenever a task requires it. There is no limit to what packages you can use; install whatever is needed to get the job done!
+   You have complete autonomy and capability to install ANY package, tool, or library on demand (e.g. 'pip install <package>') using run_command whenever a task requires it. Install whatever is needed to get the job done!
 2. Unrestricted Task Loop (Zero Half-Measures):
    You run in an unrestricted loop without artificial step limits. Work step by step until the user's task is 100% completed.
    - When asked to generate large datasets or files (e.g. 500 or 1,000 items), NEVER output a small sample of 50 or 100 items and claim it is complete!
@@ -791,26 +786,11 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
     window.addEventListener("DOMContentLoaded", () => {
       loadConfig();
       restoreChat();
-      checkTermuxPermission();
 
       if (apiKeys.length === 0) {
         openKeyModal(false);
       }
     });
-
-    window.addEventListener("focus", () => {
-      checkTermuxPermission();
-    });
-
-    function checkTermuxPermission() {
-      if (window.AndroidBridge && typeof window.AndroidBridge.isTermuxPermissionGranted === 'function') {
-        const granted = window.AndroidBridge.isTermuxPermissionGranted();
-        const banner = document.getElementById("termux-perm-banner");
-        if (banner) {
-          banner.style.display = granted ? "none" : "flex";
-        }
-      }
-    }
 
     function openAppSettings() {
       if (window.AndroidBridge && typeof window.AndroidBridge.openAppSettings === 'function') {
@@ -944,7 +924,7 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
         <div class="empty-state" id="empty-state">
           <img src="icon.png" class="empty-img" alt="Hibban's GCode AI">
           <div class="empty-title">Hibban's GCode AI</div>
-          <div class="empty-desc">Your autonomous AI developer with full Termux Linux access and multimodal vision. How can I help you today?</div>
+          <div class="empty-desc">Your autonomous AI developer with 100% standalone embedded Linux (Python 3.14, Pip, Bash, Git, Curl) and multimodal vision. How can I help you today?</div>
         </div>
       `;
     }

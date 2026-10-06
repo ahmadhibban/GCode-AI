@@ -2,3 +2,7 @@ bin/
 gen/
 *.log
 .DS_Store
+*.apk
+*.idsig
+apk/
+assets/system_bootstrap.tar.gz

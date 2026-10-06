@@ -3,11 +3,9 @@ package com.gcode.ai;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
 import android.os.Vibrator;
 import android.provider.Settings;
@@ -23,8 +21,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -35,7 +35,6 @@ public class WebAppInterface {
     public WebAppInterface(Context context) {
         this.context = context;
         this.prefs = context.getSharedPreferences("gcode_prefs", Context.MODE_PRIVATE);
-        cleanOldTempFiles();
     }
 
     private File resolveFile(String filePath) {
@@ -54,9 +53,13 @@ public class WebAppInterface {
         if (f1.exists()) {
             return f1;
         }
-        File f2 = new File("/data/data/com.termux/files/home", cleanPath);
+        File f2 = new File(new File(Environment.getExternalStorageDirectory(), "Download"), cleanPath);
         if (f2.exists()) {
             return f2;
+        }
+        File f3 = new File(context.getFilesDir(), cleanPath);
+        if (f3.exists()) {
+            return f3;
         }
         return f1;
     }
@@ -209,9 +212,8 @@ public class WebAppInterface {
     }
 
     /**
-     * Executes shell commands with full Termux Linux environment.
-     * Dual execution: tries direct ProcessBuilder, and if Android SELinux denies cross-app
-     * access, falls back seamlessly to Termux RunCommandService.
+     * Executes shell commands in the 100% STANDALONE embedded Linux environment.
+     * Runs directly via user-space PRoot with zero external Termux dependencies.
      */
     @JavascriptInterface
     public String executeCommand(String command, String workingDir) {
@@ -223,24 +225,46 @@ public class WebAppInterface {
         if (workingDir != null && !workingDir.trim().isEmpty()) {
             dir = new File(workingDir);
             if (!dir.exists() || !dir.isDirectory()) {
-                dir = new File("/storage/emulated/0/Download");
+                dir = new File(Environment.getExternalStorageDirectory(), "Download");
+                if (!dir.exists()) dir = Environment.getExternalStorageDirectory();
             }
         } else {
-            dir = new File("/storage/emulated/0/Download");
+            dir = new File(Environment.getExternalStorageDirectory(), "Download");
+            if (!dir.exists()) dir = Environment.getExternalStorageDirectory();
         }
 
-        // Try direct ProcessBuilder execution first
-        boolean directSucceeded = false;
         try {
-            File termuxBash = new File("/data/data/com.termux/files/usr/bin/bash");
-            String[] cmdArray;
-            if (termuxBash.exists() && termuxBash.canExecute()) {
-                cmdArray = new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", command};
+            File filesDir = context.getFilesDir();
+            File usrDir = new File(filesDir, "usr");
+            File homeDir = new File(filesDir, "home");
+            File tmpDir = new File(usrDir, "tmp");
+            if (!homeDir.exists()) homeDir.mkdirs();
+            if (!tmpDir.exists()) tmpDir.mkdirs();
+
+            File prootBin = new File(usrDir, "bin/proot");
+            File bashBin = new File(usrDir, "bin/bash");
+
+            List<String> cmdList = new ArrayList<>();
+            if (prootBin.exists() && bashBin.exists()) {
+                cmdList.add(prootBin.getAbsolutePath());
+                cmdList.add("-b");
+                cmdList.add(usrDir.getAbsolutePath() + ":/data/data/com.termux/files/usr");
+                cmdList.add("-b");
+                cmdList.add(homeDir.getAbsolutePath() + ":/data/data/com.termux/files/home");
+                cmdList.add("-b");
+                cmdList.add("/storage/emulated/0:/storage/emulated/0");
+                cmdList.add("-w");
+                cmdList.add(dir.getAbsolutePath());
+                cmdList.add("/data/data/com.termux/files/usr/bin/bash");
+                cmdList.add("-c");
+                cmdList.add(command);
             } else {
-                cmdArray = new String[]{"/system/bin/sh", "-c", command};
+                cmdList.add("/system/bin/sh");
+                cmdList.add("-c");
+                cmdList.add(command);
             }
 
-            ProcessBuilder pb = new ProcessBuilder(cmdArray);
+            ProcessBuilder pb = new ProcessBuilder(cmdList);
             pb.directory(dir);
 
             Map<String, String> env = pb.environment();
@@ -249,12 +273,14 @@ public class WebAppInterface {
             env.put("PREFIX", "/data/data/com.termux/files/usr");
             env.put("HOME", "/data/data/com.termux/files/home");
             env.put("TMPDIR", "/data/data/com.termux/files/usr/tmp");
+            env.put("PROOT_TMP_DIR", tmpDir.getAbsolutePath());
             env.put("TERM", "xterm-256color");
             env.put("LANG", "en_US.UTF-8");
             env.put("SHELL", "/data/data/com.termux/files/usr/bin/bash");
             env.put("SSL_CERT_FILE", "/data/data/com.termux/files/usr/etc/tls/cert.pem");
-            env.put("DEBIAN_FRONTEND", "noninteractive");
+            env.put("PYTHONHOME", "/data/data/com.termux/files/usr");
             env.put("PYTHONPATH", "/data/data/com.termux/files/usr/lib/python3.14/site-packages");
+            env.put("DEBIAN_FRONTEND", "noninteractive");
 
             pb.redirectErrorStream(true);
             Process process = pb.start();
@@ -269,179 +295,35 @@ public class WebAppInterface {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                if (output.length() < 95000) {
+                if (output.length() < 120000) {
                     output.append(line).append("\n");
                 }
             }
             reader.close();
 
-            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(180, TimeUnit.SECONDS);
             if (finished) {
                 exitCode = process.exitValue();
-                // If exitCode is 0 or command produced valid output without permission denial
-                String outStr = output.toString();
-                if (!outStr.contains("Permission denied") && !outStr.contains("not found")) {
-                    directSucceeded = true;
-                    result.put("success", true);
-                    result.put("stdout", outStr);
-                    result.put("stderr", "");
-                    result.put("exitCode", exitCode);
-                    return result.toString();
-                }
-            }
-        } catch (Exception ignored) {
-            // Direct execution failed due to SELinux denial, fall back to Termux service
-        }
-
-        // Fallback: Execute via Termux RunCommandService (Guaranteed zero-SELinux-obstruction)
-        return executeViaTermuxService(command, dir.getAbsolutePath());
-    }
-
-    private void cleanOldTempFiles() {
-        try {
-            File tmpDir = new File(Environment.getExternalStorageDirectory(), ".gcode_tmp");
-            if (tmpDir.exists() && tmpDir.isDirectory()) {
-                File[] files = tmpDir.listFiles();
-                if (files != null) {
-                    for (File f : files) {
-                        try { f.delete(); } catch (Exception ignored) {}
-                    }
-                }
-            }
-            // Also clean any legacy leftover .gcode_* files in Download
-            File dlDir = new File(Environment.getExternalStorageDirectory(), "Download");
-            if (dlDir.exists() && dlDir.isDirectory()) {
-                File[] dlFiles = dlDir.listFiles();
-                if (dlFiles != null) {
-                    for (File f : dlFiles) {
-                        if (f.getName().startsWith(".gcode_")) {
-                            try { f.delete(); } catch (Exception ignored) {}
-                        }
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private String executeViaTermuxService(String command, String workDirPath) {
-        JSONObject result = new JSONObject();
-        File scriptFile = null;
-        File outFile = null;
-        File exitFile = null;
-
-        try {
-            long id = System.currentTimeMillis();
-            File tmpDir = new File(Environment.getExternalStorageDirectory(), ".gcode_tmp");
-            if (!tmpDir.exists()) tmpDir.mkdirs();
-
-            scriptFile = new File(tmpDir, "task_" + id + ".sh");
-            outFile = new File(tmpDir, "out_" + id + ".txt");
-            exitFile = new File(tmpDir, "exit_" + id + ".txt");
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("#!/data/data/com.termux/files/usr/bin/bash\n");
-            sb.append("export PATH=\"/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin\"\n");
-            sb.append("export LD_LIBRARY_PATH=\"/data/data/com.termux/files/usr/lib\"\n");
-            sb.append("export PREFIX=\"/data/data/com.termux/files/usr\"\n");
-            sb.append("export HOME=\"/data/data/com.termux/files/home\"\n");
-            sb.append("export TMPDIR=\"/data/data/com.termux/files/usr/tmp\"\n");
-            sb.append("export SSL_CERT_FILE=\"/data/data/com.termux/files/usr/etc/tls/cert.pem\"\n");
-            sb.append("export LANG=\"en_US.UTF-8\"\n");
-            sb.append("export DEBIAN_FRONTEND=\"noninteractive\"\n");
-            sb.append("export PYTHONPATH=\"/data/data/com.termux/files/usr/lib/python3.14/site-packages\"\n");
-            sb.append("cd \"").append(workDirPath).append("\"\n");
-            sb.append("(\n").append(command).append("\n) > \"").append(outFile.getAbsolutePath()).append("\" 2>&1\n");
-            sb.append("echo $? > \"").append(exitFile.getAbsolutePath()).append("\"\n");
-            sb.append("rm -f \"$0\" 2>/dev/null\n");
-
-            FileOutputStream fos = new FileOutputStream(scriptFile);
-            fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-            fos.flush();
-            fos.close();
-
-            Intent intent = new Intent();
-            intent.setClassName("com.termux", "com.termux.app.RunCommandService");
-            intent.setAction("com.termux.RUN_COMMAND");
-            intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
-            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{scriptFile.getAbsolutePath()});
-            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", workDirPath);
-            intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
-
-            context.startService(intent);
-
-            long startTime = System.currentTimeMillis();
-            boolean done = false;
-            while (System.currentTimeMillis() - startTime < 120000) {
-                if (exitFile.exists() && exitFile.length() > 0) {
-                    done = true;
-                    break;
-                }
-                Thread.sleep(100);
+            } else {
+                process.destroyForcibly();
+                output.append("\n[Command timed out after 180 seconds]");
+                exitCode = -1;
             }
 
-            if (!done) {
-                result.put("success", false);
-                result.put("stdout", "");
-                result.put("stderr", "Command execution timed out after 120s");
-                result.put("exitCode", -1);
-                return result.toString();
-            }
-
-            String outText = "";
-            if (outFile.exists()) {
-                FileInputStream fis = new FileInputStream(outFile);
-                byte[] b = new byte[(int) Math.min(outFile.length(), 100000)];
-                int r = fis.read(b);
-                fis.close();
-                if (r > 0) {
-                    outText = new String(b, 0, r, StandardCharsets.UTF_8);
-                }
-            }
-
-            int exitVal = 0;
-            if (exitFile.exists()) {
-                FileInputStream fis = new FileInputStream(exitFile);
-                byte[] b = new byte[32];
-                int r = fis.read(b);
-                fis.close();
-                if (r > 0) {
-                    String str = new String(b, 0, r, StandardCharsets.UTF_8).trim();
-                    try {
-                        exitVal = Integer.parseInt(str);
-                    } catch (Exception ignored) {}
-                }
-            }
-
-            result.put("success", true);
-            result.put("stdout", outText);
+            result.put("success", exitCode == 0);
+            result.put("stdout", output.toString());
             result.put("stderr", "");
-            result.put("exitCode", exitVal);
-        } catch (SecurityException se) {
+            result.put("exitCode", exitCode);
+            return result.toString();
+        } catch (Throwable e) {
             try {
                 result.put("success", false);
-                result.put("stdout", "");
-                result.put("stderr", "Permission Denied: com.termux.permission.RUN_COMMAND is not granted to this app.\nPlease open Phone Settings -> Apps -> Hibban's GCode AI -> Permissions -> Other/Additional Permissions -> Allow 'Run commands in Termux environment'.");
+                result.put("stdout", output.toString());
+                result.put("stderr", "Execution error: " + e.getMessage());
                 result.put("exitCode", -1);
             } catch (Exception ignored) {}
-        } catch (Exception e) {
-            try {
-                result.put("success", false);
-                result.put("stdout", "");
-                result.put("stderr", "Execution Error: " + e.getMessage());
-                result.put("exitCode", -1);
-            } catch (Exception ignored) {}
-        } finally {
-            try {
-                if (scriptFile != null && scriptFile.exists()) scriptFile.delete();
-            } catch (Exception ignored) {}
-            try {
-                if (outFile != null && outFile.exists()) outFile.delete();
-            } catch (Exception ignored) {}
-            try {
-                if (exitFile != null && exitFile.exists()) exitFile.delete();
-            } catch (Exception ignored) {}
+            return result.toString();
         }
-        return result.toString();
     }
 
     @JavascriptInterface
@@ -631,9 +513,6 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public boolean isTermuxPermissionGranted() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            return context.checkSelfPermission("com.termux.permission.RUN_COMMAND") == PackageManager.PERMISSION_GRANTED;
-        }
         return true;
     }
 
