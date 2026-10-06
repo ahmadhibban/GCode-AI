@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         checkAndRequestAllPermissions();
 
         File usrBash = new File(getFilesDir(), "usr/bin/bash");
-        File marker = new File(getFilesDir(), ".installed_v3");
+        File marker = new File(getFilesDir(), ".installed_v4");
 
         if (marker.exists() && usrBash.exists()) {
             initWebView();
@@ -188,13 +188,13 @@ public class MainActivity extends Activity {
             }
 
             try {
-                new ProcessBuilder("/system/bin/toybox", "chmod", "-R", "755", binDir.getAbsolutePath())
+                new ProcessBuilder("/system/bin/toybox", "chmod", "-R", "755", usrDir.getAbsolutePath())
                         .start().waitFor();
             } catch (Throwable ignored) {}
 
             File bashCheck = new File(usrDir, "bin/bash");
             if (bashCheck.exists() && bashCheck.length() > 0) {
-                new File(filesDir, ".installed_v3").createNewFile();
+                new File(filesDir, ".installed_v4").createNewFile();
                 return true;
             }
         } catch (Throwable e) {

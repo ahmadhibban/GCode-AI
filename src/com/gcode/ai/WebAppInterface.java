@@ -268,8 +268,10 @@ public class WebAppInterface {
             pb.directory(dir);
 
             Map<String, String> env = pb.environment();
-            env.put("PATH", "/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin");
-            env.put("LD_LIBRARY_PATH", "/data/data/com.termux/files/usr/lib");
+            String appLibDir = new File(usrDir, "lib").getAbsolutePath();
+            String appBinDir = new File(usrDir, "bin").getAbsolutePath();
+            env.put("PATH", appBinDir + ":/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin");
+            env.put("LD_LIBRARY_PATH", appLibDir + ":/data/data/com.termux/files/usr/lib");
             env.put("PREFIX", "/data/data/com.termux/files/usr");
             env.put("HOME", "/data/data/com.termux/files/home");
             env.put("TMPDIR", "/data/data/com.termux/files/usr/tmp");
