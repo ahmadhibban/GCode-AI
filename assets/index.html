@@ -66,6 +66,16 @@
       display: inline;
     }
 
+    .ar-block {
+      font-family: 'Amiri', serif !important;
+      font-size: 1.22em;
+      line-height: 1.95;
+      direction: rtl !important;
+      text-align: right !important;
+      unicode-bidi: isolate;
+      margin: 6px 0;
+    }
+
     .bn-text {
       font-family: 'Kalpurush', sans-serif !important;
       font-size: 1.06em;
@@ -363,9 +373,11 @@
       resize: none;
       max-height: 120px;
       min-height: 46px;
-      line-height: 1.45;
+      line-height: 1.55;
       outline: none;
-      font-family: inherit;
+      font-family: 'Kalpurush', 'Amiri', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: 0.2px;
+      transition: border-color 0.2s;
     }
 
     #user-input:focus {
@@ -618,7 +630,7 @@
 
   <!-- Clean Input Footer -->
   <footer>
-    <textarea id="user-input" rows="1" placeholder="Type a message or task..." oninput="autoResize(this)" onkeydown="checkEnter(event)"></textarea>
+    <textarea id="user-input" rows="1" placeholder="Type a message or task..." oninput="handleInputChange(this)" onkeydown="checkEnter(event)"></textarea>
     <button id="send-btn" onclick="handleSend()">➔</button>
   </footer>
 
@@ -749,6 +761,11 @@ Important Paths:
 - Primary Storage: /storage/emulated/0
 - Camera Photos: /storage/emulated/0/DCIM/Camera
 - Screenshots: /storage/emulated/0/DCIM/Screenshots
+
+USER IDENTITY & PROFILE:
+- The user's full name is Ahmad Hibban (আহমাদ হিব্বান).
+- You are Ahmad Hibban's personal autonomous AI coding assistant and software developer.
+- You know and recognize Ahmad Hibban as your creator, user, and the owner of this device.
 
 CORE PRINCIPLES (Modeled after Antigravity CLI):
 1. Autonomous On-Demand Package Installation:
@@ -890,9 +907,22 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
       closeKeyModal();
     }
 
-    function autoResize(el) {
+    function handleInputChange(el) {
       el.style.height = "auto";
       el.style.height = Math.min(el.scrollHeight, 120) + "px";
+      const val = el.value.trim();
+      const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+      if (arabicRegex.test(val)) {
+        el.style.direction = "rtl";
+        el.style.textAlign = "right";
+      } else {
+        el.style.direction = "ltr";
+        el.style.textAlign = "left";
+      }
+    }
+
+    function autoResize(el) {
+      handleInputChange(el);
     }
 
     function checkEnter(e) {
@@ -1017,7 +1047,7 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
       banner.style.display = active ? "flex" : "none";
       if (active) {
         dot.className = "status-dot busy";
-        statusText.textContent = text;
+        statusText.textContent = "Active";
         liveText.textContent = text;
       } else {
         dot.className = "status-dot";
@@ -1312,8 +1342,33 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
         return id;
       });
 
-      // Wrap Arabic words in .ar-text (Amiri font at 1.18x size, RTL)
-      html = html.replace(/([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)/g, '<span class="ar-text">$1</span>');
+      // Detect and wrap Arabic RTL paragraphs / lines
+      const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+      const lines = html.split('\n');
+      const processedLines = lines.map(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("__CODE_BLOCK_")) return line;
+
+        let arCount = 0;
+        let otherCount = 0;
+        for (let i = 0; i < trimmed.length; i++) {
+          const code = trimmed.charCodeAt(i);
+          if ((code >= 0x0600 && code <= 0x06FF) || (code >= 0x0750 && code <= 0x077F) || (code >= 0x08A0 && code <= 0x08FF) || (code >= 0xFB50 && code <= 0xFDFF) || (code >= 0xFE70 && code <= 0xFEFF)) {
+            arCount++;
+          } else if ((code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A) || (code >= 0x0980 && code <= 0x09FF)) {
+            otherCount++;
+          }
+        }
+
+        if (arCount > 0 && (arCount >= otherCount || arabicRegex.test(trimmed.charAt(0)))) {
+          return `<div class="ar-block" dir="rtl">${line}</div>`;
+        }
+        return line;
+      });
+      html = processedLines.join('\n');
+
+      // Wrap any inline Arabic words in .ar-text (Amiri font at 1.18x size, RTL)
+      html = html.replace(/([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)/g, '<span class="ar-text" dir="rtl">$1</span>');
 
       // Wrap Bengali words in .bn-text (Kalpurush font with spacious letter and word spacing)
       html = html.replace(/([\u0980-\u09FF]+)/g, '<span class="bn-text">$1</span>');
@@ -1331,6 +1386,9 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
       html = html.replace(/^\s*-\s+(.*)$/gm, '• $1<br>');
       // Newlines
       html = html.replace(/\n/g, '<br>');
+      html = html.replace(/<\/div><br>/g, '</div>');
+      html = html.replace(/<pre><br>/g, '<pre>');
+      html = html.replace(/<\/pre><br>/g, '</pre>');
 
       return html;
     }
