@@ -109,7 +109,8 @@ public class MainActivity extends Activity {
                     Manifest.permission.READ_EXTERNAL_STORAGE,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE,
                     Manifest.permission.CAMERA,
-                    Manifest.permission.RECORD_AUDIO
+                    Manifest.permission.RECORD_AUDIO,
+                    "com.termux.permission.RUN_COMMAND"
             };
             boolean needReq = false;
             for (String p : perms) {

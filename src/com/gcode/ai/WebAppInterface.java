@@ -3,10 +3,14 @@ package com.gcode.ai;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import org.json.JSONArray;
@@ -412,6 +416,13 @@ public class WebAppInterface {
             result.put("stdout", outText);
             result.put("stderr", "");
             result.put("exitCode", exitVal);
+        } catch (SecurityException se) {
+            try {
+                result.put("success", false);
+                result.put("stdout", "");
+                result.put("stderr", "Permission Denied: com.termux.permission.RUN_COMMAND is not granted to this app.\nPlease open Phone Settings -> Apps -> Hibban's GCode AI -> Permissions -> Other/Additional Permissions -> Allow 'Run commands in Termux environment'.");
+                result.put("exitCode", -1);
+            } catch (Exception ignored) {}
         } catch (Exception e) {
             try {
                 result.put("success", false);
@@ -616,5 +627,23 @@ public class WebAppInterface {
     @JavascriptInterface
     public String getConfig(String key, String defaultValue) {
         return prefs.getString(key, defaultValue);
+    }
+
+    @JavascriptInterface
+    public boolean isTermuxPermissionGranted() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return context.checkSelfPermission("com.termux.permission.RUN_COMMAND") == PackageManager.PERMISSION_GRANTED;
+        }
+        return true;
+    }
+
+    @JavascriptInterface
+    public void openAppSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + context.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ignored) {}
     }
 }

@@ -607,6 +607,12 @@
     <span id="live-status-text">Thinking...</span>
   </div>
 
+  <!-- Termux Permission Warning Banner -->
+  <div id="termux-perm-banner" style="display:none; padding:10px 16px; background:rgba(239,68,68,0.18); border-bottom:1px solid rgba(239,68,68,0.35); font-size:13px; color:#fca5a5; align-items:center; justify-content:space-between; cursor:pointer;" onclick="openAppSettings()">
+    <span>⚠️ Termux run command permission needed. Tap to enable.</span>
+    <span style="font-weight:bold; text-decoration:underline;">Settings ➔</span>
+  </div>
+
   <!-- Chat Stream -->
   <div id="chat-container">
     <div class="empty-state" id="empty-state">
@@ -785,11 +791,32 @@ Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
     window.addEventListener("DOMContentLoaded", () => {
       loadConfig();
       restoreChat();
+      checkTermuxPermission();
 
       if (apiKeys.length === 0) {
         openKeyModal(false);
       }
     });
+
+    window.addEventListener("focus", () => {
+      checkTermuxPermission();
+    });
+
+    function checkTermuxPermission() {
+      if (window.AndroidBridge && typeof window.AndroidBridge.isTermuxPermissionGranted === 'function') {
+        const granted = window.AndroidBridge.isTermuxPermissionGranted();
+        const banner = document.getElementById("termux-perm-banner");
+        if (banner) {
+          banner.style.display = granted ? "none" : "flex";
+        }
+      }
+    }
+
+    function openAppSettings() {
+      if (window.AndroidBridge && typeof window.AndroidBridge.openAppSettings === 'function') {
+        window.AndroidBridge.openAppSettings();
+      }
+    }
 
     function loadConfig() {
       let savedKeysJson = "";
