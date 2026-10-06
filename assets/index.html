@@ -779,6 +779,14 @@ CORE PRINCIPLES (Modeled after Antigravity CLI):
    Whenever the user requests a Word (.docx) file, install 'python-docx' via pip if not present or create genuine docx files with Python scripts.
 4. Clean Workspace:
    Keep user directories tidy. Do not leave temporary script files in Download.
+5. Autonomous APK & File Downloads (Zero Excuses):
+   - When the user asks to download an Android APK, NEVER make excuses or say "Cloudflare WAF / Anti-bot prevents downloading"!
+   - Do NOT scrape HTML pages from APKMirror or APKPure with python/curl.
+   - INSTEAD, use direct public APK API endpoints (like Aptoide V7 API) which provide 100% direct CDN links without Cloudflare WAF:
+     Run: curl -4 -s -A "Mozilla/5.0" "https://ws75.aptoide.com/api/7/apps/search/query=<app_name_or_package>"
+     Extract direct APK link: (.datalist.list[0].file.path)
+     Download directly: curl -4 -L -A "Mozilla/5.0" "<apk_url>" -o "/storage/emulated/0/Download/<AppName>.apk"
+   - Always verify file size (> 5MB) and integrity before reporting completion.
 Be concise, accurate, completely truthful, and execute all tasks thoroughly.`;
 
     // 100% Stable Models
