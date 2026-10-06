@@ -1,6 +1,6 @@
 # Hibban's GCode AI 🚀
 
-An autonomous AI developer and coding assistant running natively on Android with **full Termux Linux environment access** and **Multimodal Vision**.
+An autonomous AI developer and coding assistant running natively on Android with a **100% Standalone Embedded Linux Distribution** and **Multimodal Vision**.
 
 Developed by **Ahmad Hibban**.
 
@@ -8,20 +8,21 @@ Developed by **Ahmad Hibban**.
 
 ## ✨ Features
 
-- **Native Linux Execution:** Connects directly to Termux's `/data/data/com.termux/files/usr/bin/bash` with full environment variables (`PATH`, `PREFIX`, `HOME`, `PYTHONPATH`, `SSL_CERT_FILE`, `JAVA_HOME`).
+- **100% Standalone Embedded Linux:** Bundles a complete, self-contained Linux environment (GNU Bash, Python 3.14, Pip, Git, Curl, GNU Coreutils, and PRoot user-space virtualization engine) directly inside the app.
+- **Zero Termux Dependencies:** Completely independent. Works out-of-the-box on ANY Android device without requiring Termux or any cross-app permissions.
+- **Direct User-Space Execution:** Executes scripts and shell commands through PRoot without root permissions and without SELinux denials.
 - **Autonomous Multimodal Vision:** Inspects and analyzes any photo, camera capture, or screenshot on the phone using Gemini's multimodal vision model via the `view_image` tool.
-- **Unrestricted Filesystem Access:** Full read/write access across all phone storage (`/storage/emulated/0`, DCIM, Download) and Termux home (`~`).
-- **Zero Buffer Deadlocks & Stdin Protection:** Merged stdout/stderr streams, non-interactive execution, and 120s timeout protection.
+- **Unrestricted Filesystem Access:** Full read/write access across phone storage (`/storage/emulated/0`, DCIM, Download).
+- **Unrestricted Agent Loop:** Modeled after Antigravity CLI with autonomous on-demand package installation and continuous execution until tasks are 100% completed.
 - **Multi-Key Quota Rotation:** Supports multiple Google Gemini API keys with intelligent automatic rotation upon rate limits (429).
 - **Persistent Chat:** Conversation history is securely preserved across app restarts and device reboots.
-- **Sleek Custom Modal:** Elegant dark-glass confirmation dialog for clearing history with zero clunky OS prompts.
 - **Bilingual & Beautiful Typography:** Custom high-legibility Bengali font (*Kalpurush*) and Arabic font (*Amiri*) with a sleek dark slate theme.
 
 ---
 
 ## 🛠️ Built-in Agent Tools
 
-1. `run_command` — Execute bash/terminal commands, run Python 3.14 scripts, git, ffmpeg, curl, etc.
+1. `run_command` — Execute bash/terminal commands in the built-in Linux environment, run Python 3.14 scripts, pip install, git, curl, etc.
 2. `read_file` — Read any text file with 1-indexed line numbers and smart path resolution.
 3. `write_file` — Create or overwrite files anywhere on the device.
 4. `edit_file` — Precise text substring replacement with collision prevention.
@@ -32,46 +33,40 @@ Developed by **Ahmad Hibban**.
 
 ## 📱 Prebuilt APK
 
-The signed, ready-to-install Android APK is available in the repository at:
-[`apk/GCode_AI.apk`](apk/GCode_AI.apk)
+The signed, ready-to-install Android APK (v3.0.0 Standalone Edition) is located on device at:
+`/storage/emulated/0/Download/GCode_AI.apk`
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-├── AndroidManifest.xml   # Full permissions & hardware access
-├── apk/
-│   ├── GCode_AI.apk      # Signed Release APK
-│   └── GCode_AI.apk.idsig # APK signature v4 scheme ID
+├── AndroidManifest.xml   # Standalone configuration (API 28, full storage access)
 ├── assets/
 │   ├── index.html        # Modern Dark Chat UI & Agent engine
 │   ├── icon.png          # App 3D branding icon
-│   └── fonts/            # Kalpurush & Amiri fonts
+│   ├── fonts/            # Kalpurush & Amiri fonts
+│   ├── system_bootstrap.tar.gz.part_aa # Embedded Linux rootfs (Part 1)
+│   ├── system_bootstrap.tar.gz.part_ab # Embedded Linux rootfs (Part 2)
+│   └── system_bootstrap.tar.gz.part_ac # Embedded Linux rootfs (Part 3)
 ├── src/com/gcode/ai/
-│   ├── MainActivity.java # WebView host with runtime permission management
-│   └── WebAppInterface.java # Native Java bridge to Termux shell & vision
+│   ├── MainActivity.java # Setup progress extractor & WebView host
+│   └── WebAppInterface.java # Standalone PRoot process engine & vision bridge
 ├── res/                  # App drawables, launcher icons, strings
-├── build_apk.sh          # Native Termux build script (aapt + javac + d8 + apksigner)
+├── build_apk.sh          # Native Android build script (aapt + javac + d8 + apksigner)
 ├── debug.keystore        # Keystore for release APK signing
-├── gcode_cli.py          # Standalone Termux CLI version
 └── README.md             # Project documentation
 ```
 
 ---
 
-## 🛠️ Build from Source (Termux / Linux)
+## 🛠️ Build from Source (Android / Linux)
 
-Prerequisites:
-- Android SDK build tools (`aapt`, `d8`, `apksigner`)
-- `android.jar` (API 28+)
-- Java compiler (`javac`)
-
-To build and sign the APK:
+To compile, package, and sign the standalone APK:
 ```bash
 bash build_apk.sh
 ```
-The output APK will be placed in `apk/GCode_AI.apk`.
+The output APK will be placed in `/storage/emulated/0/Download/GCode_AI.apk` and `apk/GCode_AI.apk`.
 
 ---
 
