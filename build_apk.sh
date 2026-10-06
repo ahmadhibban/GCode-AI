@@ -24,7 +24,7 @@ echo "==> 4. Converting to Dalvik Executable (d8)..."
 d8 --lib "$ANDROID_JAR" --output bin/ $(find bin/ -name "*.class")
 
 echo "==> 5. Packaging APK with resources and assets..."
-aapt package -f -0 gz -0 tgz -0 xz -0 part_aa -0 part_ab -0 part_ac -M AndroidManifest.xml -S res/ -A assets/ -I "$ANDROID_JAR" -F bin/app.unsigned.apk
+aapt package -f -0 gz -0 tgz -0 xz -0 part_aa -0 part_ab -0 part_ac -0 part_ad -0 part_ae -0 part_af -M AndroidManifest.xml -S res/ -A assets/ -I "$ANDROID_JAR" -F bin/app.unsigned.apk
 cd bin
 aapt add app.unsigned.apk classes.dex
 cd ..

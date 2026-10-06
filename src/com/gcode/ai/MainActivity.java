@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         checkAndRequestAllPermissions();
 
         File usrBash = new File(getFilesDir(), "usr/bin/bash");
-        File marker = new File(getFilesDir(), ".installed_v4");
+        File marker = new File(getFilesDir(), ".installed_v5");
 
         if (marker.exists() && usrBash.exists()) {
             initWebView();
@@ -148,6 +148,7 @@ public class MainActivity extends Activity {
             } catch (Throwable notMonolithic) {
                 // Read from split parts seamlessly
                 List<InputStream> parts = new ArrayList<>();
+                outer:
                 for (char c1 = 'a'; c1 <= 'z'; c1++) {
                     for (char c2 = 'a'; c2 <= 'z'; c2++) {
                         String partName = "system_bootstrap.tar.gz.part_" + c1 + c2;
@@ -155,10 +156,9 @@ public class MainActivity extends Activity {
                             InputStream partStream = getAssets().open(partName);
                             parts.add(partStream);
                         } catch (Throwable noMoreParts) {
-                            break;
+                            break outer;
                         }
                     }
-                    if (parts.isEmpty()) break;
                 }
                 Enumeration<InputStream> en = Collections.enumeration(parts);
                 is = new SequenceInputStream(en);
@@ -194,7 +194,7 @@ public class MainActivity extends Activity {
 
             File bashCheck = new File(usrDir, "bin/bash");
             if (bashCheck.exists() && bashCheck.length() > 0) {
-                new File(filesDir, ".installed_v4").createNewFile();
+                new File(filesDir, ".installed_v5").createNewFile();
                 return true;
             }
         } catch (Throwable e) {

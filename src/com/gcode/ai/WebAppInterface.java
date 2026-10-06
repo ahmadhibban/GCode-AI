@@ -247,6 +247,11 @@ public class WebAppInterface {
             List<String> cmdList = new ArrayList<>();
             if (prootBin.exists() && bashBin.exists()) {
                 cmdList.add(prootBin.getAbsolutePath());
+                cmdList.add("-0");
+                cmdList.add("-b");
+                cmdList.add("/dev");
+                cmdList.add("-b");
+                cmdList.add("/proc");
                 cmdList.add("-b");
                 cmdList.add(usrDir.getAbsolutePath() + ":/data/data/com.termux/files/usr");
                 cmdList.add("-b");
